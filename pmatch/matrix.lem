@@ -1,0 +1,113 @@
+(* The new plan: 
+
+compile_match : bool -> Cexp -> list (Cpat * Cexp) -> Cexp
+  satisfying:
+    ∀b menv s env exp pes s' v env' e v'.
+      Cevaluate menv s env exp (s', Cval v) ∧
+      Cevaluate_match s' v pes env' (SOME e) ∧
+      Cevaluate menv s' (env' ++ env) e res
+      ⇒
+      Cevaluate menv s env (compile_match b exp pes) res
+  and
+    ∀b menv s env exp pes s' v .
+      Cevaluate menv s env exp (s', Cval v) ∧
+      Cevaluate_match s' v pes [] NONE
+      ⇒
+      Cevaluate menv s env (compile_match b exp pes)
+        (s', Cexc (Craise (if b then v else CBind_excv)))
+  and
+    ∀b menv s env exp pes s' v.
+      Cevaluate menv s env exp (s', Cexc v)
+      ⇒
+      Cevaluate menv s env (compile_match b exp pes) (s', Cexc v)
+*)
+
+(*
+The first plan:
+
+  Write
+
+  compile_match : exp -> list (pat * exp) -> exp
+
+  and prove that it satisfies
+
+  ∀e pes.
+    simple_matches_only e ∧
+    EVERY simple_matches_only (MAP SND pes)
+    ⇒
+    simple_matches_only (compile_match e pes)
+
+  and
+
+  ∀ck menv cenv s env res.
+    evaluate ck menv cenv s env (Mat e pes) res ⇒
+    evaluate ck menv cenv s env (compile_match e pes) res
+
+(* For reference:
+Handle e pes
+  should be equivalent to:
+Mat e (pes++[(Pvar"e", Raise(Var(Short"e")))])
+*)
+
+let rec
+simple_matches_only (Raise e) = simple_matches_only e
+and
+simple_matches_only (Handle e pes) =
+  simple_matches_only e &&
+  simple_matches_only_pes pes &&
+and
+simple_matches_only (Lit _) = true
+and
+simple_matches_only (Con n es) =
+  simple_matches_only_list es
+and
+simple_matches_only (Var _) = true
+and
+simple_matches_only (Fun _ e) = simple_matches_only e
+and
+simple_matches_only (Uapp _ e) = simple_matches_only e
+and
+simple_matches_only (App _ e1 e2) =
+  simple_matches_only e1 &&
+  simple_matches_only e2
+and
+simple_matches_only (Log _ e1 e2) =
+  simple_matches_only e1 &&
+  simple_matches_only e2
+and
+simple_matches_only (If e1 e2 e3) =
+  simple_matches_only e1 &&
+  simple_matches_only e2 &&
+  simple_matches_only e3
+and
+simple_matches_only (Mat e pes) =
+  simple_matches_only e &&
+  simple_matches_only_pes pes
+and
+simple_matches_only (Let _ e1 e2) =
+  simple_matches_only e1 &&
+  simple_matches_only e2
+and
+simple_matches_only (Letrec defs e) =
+  simple_matches_only_defs defs &&
+  simple_matches_only e
+and
+simple_matches_only_list [] = true
+and
+simple_matches_only_list (e::es) =
+  simple_matches_only e &&
+  simple_matches_only_list es
+and
+simple_matches_only_pes [] = true
+and
+simple_matches_only_pes ((p,e)::pes) =
+  (exists n vs.
+    p = Pcon n vs &&
+    forall v. List.mem v vs --> exists a. v = Pvar a) &&
+  simple_matches_only e &&
+  simple_matches_only_pes pes
+
+type match_matrix =
+  Matrix of list exp * list (list pat * exp)
+
+*)
