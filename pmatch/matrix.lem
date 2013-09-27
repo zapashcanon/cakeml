@@ -1,3 +1,133 @@
+type matrix_row = list Cpat * list num * Cexp
+(* semantics of a row:
+  * ps,ns,e
+  * is
+  * Match ps ->
+  * let (EL 0 ns) in
+  * let (EL 1 ns) in
+  * ... 
+  * in e
+*)
+
+type matrix =
+  Matrix of list num * list matrix_row
+
+(*
+old stuff
+type Mpat =
+  | MPvar of option num
+  | MPlit of lit
+  | MPcon of num * list Mpat
+  | MPref of Mpat
+
+type matrix =
+  Matrix of list num * list (list Mpat * list (option num) * Cexp)
+*)
+
+(* intended semantics:
+Matrix vs ((ps,ns,e),...) =
+  match vs with rows 
+  
+  ????
+
+Matrix [v0,...,vn] [([p00,...,p0n],e0),...,([pm0,...,pmn],em)] =
+  match (v0,...,vn) with
+  | (p00,...,p0n) -> e0
+  | ...
+  | (pm0,...,pmn) -> em
+  end
+*)
+
+(* try_matrix_to_Cexp : bool -> matrix -> option Cexp
+ * implement using existing remove_mat ideas *)
+
+let simplify_matrix m = m
+
+let select_column pses = 0
+
+let rec
+extract_column n [] = []
+and
+extract_column n ((ps,e),pses) =
+  (List.nth n ps)::(extract_column n pses)
+
+let rec
+rest _ [] = []
+and
+rest 0 (p::ps) = ps
+and
+rest (n+1) (p::ps) = (p::rest n ps)
+
+let rec
+elim_var_col n v [] = []
+and
+elim_var_col n v ((ps,e),pses) =
+  ((rest n ps),CLet (CVar(Short v)) )::(elim_var_col n pses)
+
+type column_type =
+  VarCol | LitCol | ConCol | RefCol
+
+let rec
+column_type [] = VarCol
+and
+column_type (Pvar::ps) = column_type ps
+and
+column_type ((Plit _)::_) = LitCol
+and
+column_type ((Pcon _ _)::_) = ConCol
+and
+column_type ((Pref _)::_) = RefCol
+
+val compile_matrix_step : bool -> matrix -> list matrix * (list Cexp -> Cexp)
+let compile_matrix_step b m =
+  let m = simplify_matrix m in
+  match try_matrix_to_Cexp b m
+  | Some e -> ([],fun _ -> e)
+  | None -> match m with Matrix vs pses ->
+      let n = select_column pses in
+      let ps = extract_column n pses in
+        match column_type ps in
+        | VarCol ->
+          ([Matrix
+            (rest n vs)
+            (elim_var_col n (List.nth n vs) pses)]
+          ,List.hd)
+        | LitCol ->
+        | ConCol ->
+        | RefCol ->
+        end
+
+  end
+
+let rec
+compile_matrix b m =
+  let (ms,f) = compile_matrix_step b m in
+  match ms with
+  | [] -> f []
+  | ms -> let es = List.map (compile_matrix b) ms in f es
+  end
+
+let rec
+Cpat_to_Mpat n CPvar = MPvar (Some n)
+and
+Cpat_to_Mpat n (CPlit l) = MPlit l
+and
+Cpat_to_Mpat n (CPcon a ps) = MPcon a (Cpats_to_Mpats n ps)
+and
+Cpat_to_Mpat n (CPref p) = MPref (Cpat_to_Mpat n p)
+and
+Cpats_to_Mpats n [] = []
+and
+Cpats_to_Mpats n (p::ps) =
+  (Cpat_to_Mpat n p)::(Cpats_to_Mpats (n + Cpat_vars p) ps)
+
+let compile_match b e pes =
+  CLet e
+    (compile_matrix b
+      (Matrix [0]
+        (List.map (fun (p,e) -> ([Cpat_to_Mpat 0 p],shift 1 (Cpat_vars p) e))
+        pes)))
+
 (* The new plan: 
 
 compile_match : bool -> Cexp -> list (Cpat * Cexp) -> Cexp
