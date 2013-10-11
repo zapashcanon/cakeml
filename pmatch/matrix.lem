@@ -5,7 +5,7 @@ type matrix_row = MatrixRow list Cpat * Cexp
  *)
 
 type matrix =
-  Matrix of bool * list num * list matrix_row
+  Matrix of option num * list num * list matrix_row
 
 (* intended semantics:
 
@@ -41,196 +41,216 @@ let sem_equiv : semantics -> semantics -> bool
 val try_matrix_to_Cexp : matrix -> option Cexp
 
 let try_matrix_to_Cexp (Matrix is_exn input rows) =
-  match rows with
-    | [] -> Some (if is_exn then ... else raise match)
-    | (MatrixRow (pats, e) :: _) -> 
-       if List.for_all is_Cvar pats then Some (
-                      Let input0 
-                      Let input1 
-                      Let input2 
-                      Let input3 
-                      e
-       )
-       else None
- 
+match rows with
+  | [] -> Some CRaise (match is_exn with None -> Bind_exc | Some orig_var -> CVar(Short orig_var) end)
+  | (MatrixRow (pats, e) :: _) -> 
+     if List.for_all is_Cvar pats then Some (
+                    CLet (CVar(Short input0))
+                      CLet (CVar(Short input1))
+                          CLet (CVar(Short input2))
+                            ...
+                               e
+     )
+     else None
+
 (* select_column is a heuristic that selects a column of 
- * a matrix. It can be implemented by fancy heuristics, but it
- * only guarentees:
- *
- * if the matrix has at least one row and at least one column,
- * then a number less then the number of columns is returned. 
- *)
+* a matrix. It can be implemented by fancy heuristics, but it
+* only guarentees:
+*
+* if the matrix has at least one row and at least one column,
+* then a number less then the number of columns is returned. 
+*)
 
 val select_column : matrix -> num
 let select_column _ = 0
 
 
 (* [extract_column colNo matrix] extracts column [colNo] from
-   Matrix [matrix]. Extracting means essentially removing column no
-   [colNo] and putting it at the end of the matrix. The right-hand side
-   expressions need to be modified in order to support this change
-   without changed semantics.
+ Matrix [matrix]. Extracting means essentially removing column no
+ [colNo] and putting it at the end of the matrix. The right-hand side
+ expressions need to be modified in order to support this change
+ without changed semantics.
 
-   extract_column i 
+ extract_column i 
+   (Matrix is_exn 
+     [v0, ..., vn] 
+     [MatrixRow ([p00, ..., p0n], e0), 
+      ...
+      MatrixRow ([pm0, ..., pmn], em)])
+ = (Matrix is_exn 
+     [v0, ..., v{i-1}, v{i+1}, ... vn] 
+     [MatrixRow ([p00, ..., p0{i-1}, p0{i+1}, ..., p0n], e0'), 
+      ...
+      MatrixRow ([pm0, ..., pm{i-1}, pm{i+1}, ..., pmn], em')],
+    vi,
+    [p0i, ... pmi])
+
+such that 
+  
+  sem_equiv (matrix_sem     
      (Matrix is_exn 
-       [v0, ..., vn] 
-       [MatrixRow ([p00, ..., p0n], e0), 
-        ...
-        MatrixRow ([pm0, ..., pmn], em)])
-   = (Matrix is_exn 
-       [v0, ..., v{i-1}, v{i+1}, ... vn] 
-       [MatrixRow ([p00, ..., p0{i-1}, p0{i+1}, ..., p0n], e0'), 
-        ...
-        MatrixRow ([pm0, ..., pm{i-1}, pm{i+1}, ..., pmn], em')],
-      vi,
-      [p0i, ... pmi])
-
-  such that 
-    
-    sem_equiv (matrix_sem     
-       (Matrix is_exn 
-          [v0, ..., vn] 
-          [MatrixRow ([p00, ..., p0n], e0), 
-           ...
-           MatrixRow ([pm0, ..., pmn], em)]))
-       (matrix_sem (Matrix is_exn 
-          [v0, ..., v{i-1}, v{i+1}, ..., vn, vi] 
-          [MatrixRow ([p00, ..., p0{i-1}, p0{i+1}, ..., p0n, p0i], e0), 
-           ...
-           MatrixRow ([pm0, ..., pm{i-1}, pm{i+1}, ..., pmn, pmi], em)])))
-     
-*)     
+        [v0, ..., vn] 
+        [MatrixRow ([p00, ..., p0n], e0), 
+         ...
+         MatrixRow ([pm0, ..., pmn], em)]))
+     (matrix_sem (Matrix is_exn 
+        [v0, ..., v{i-1}, v{i+1}, ..., vn, vi] 
+        [MatrixRow ([p00, ..., p0{i-1}, p0{i+1}, ..., p0n, p0i], e0'), 
+         ...
+         MatrixRow ([pm0, ..., pm{i-1}, pm{i+1}, ..., pmn, pmi], em')])))
+   
+*)
 
 val extract_column : num -> matrix -> (matrix * num * list Cpat)
 
+let extract_column i (Matrix is_exn input rows) =
+let vs = List.take i input @ List.drop (i+1) input in
+let vi = List.nth input i
+let rps = List.map (process_row i) rows in
+let (rows',ps) = List.unzip rps in
+(Matrix is_exn vs rows', vi, ps)
+
+val process_row : num -> matrix_row -> matrix_row * Cpat
+let process_row i (MatrixRow ps e) =
+let psl = List.take i ps in
+let psr = List.drop (i+1) ps in
+let pi = List.nth p ps in
+let nvr = Cpat_vars_list psr in
+let e' = ??shift?? (Cpat_vars pi) nvr e in
+(MatrixRow (psl@psr) e', List.nth i ps)
+
 (*
-let rec
-extract_column n [] = []
-and
-extract_column n ((ps,e),pses) =
-  (List.nth n ps)::(extract_column n pses)
-
-let rec
-rest _ [] = []
-and
-rest 0 (p::ps) = ps
-and
-rest (n+1) (p::ps) = (p::rest n ps)
-
-let rec
-elim_var_col n v [] = []
-and
-elim_var_col n v ((ps,e),pses) =
-  ((rest n ps),CLet (CVar(Short v)) )::(elim_var_col n pses)
-
-type column_type =
-  VarCol | LitCol | ConCol | RefCol
-
-let rec
-column_type [] = VarCol
-and
-column_type (Pvar::ps) = column_type ps
-and
-column_type ((Plit _)::_) = LitCol
-and
-column_type ((Pcon _ _)::_) = ConCol
-and
-column_type ((Pref _)::_) = RefCol
-
+??shift?? k n e =
+context: k+n variables bound above e
+result: move the k variables over the n variables
 *)
 
-
 (* get_distinct_patterns extracts the distinct cases from a given list of patterns.
-   Variable patterns are always ignored. Constructors should appear only once.
-   I.e. if there are two occurences "C1 p1" and "C1 p2", of the same constructor
-   "C1", only one should be in the resulting list. *)
+ Variable patterns are always ignored. Constructors should appear only once.
+ I.e. if there are two occurences "C1 p1" and "C1 p2", of the same constructor
+ "C1", only one should be in the resulting list. *)
 val get_distinct_patterns : list Cpat -> list Cpat
 
+
+(* for covers, perhaps use IS_SOME o match_pattern *)
 let rec get_distinct_patterns acc ps = match ps with
-  | [] -> acc
-  | (p :: ps) -> 
-      let acc' = if (acc already convers p) then acc else (replace arguments of p with vars)::acc in
-      get_distinct_patterns acc' ps
+| [] -> acc
+| (p :: ps) ->
+    let acc' = if (acc already covers p) then acc else (replace arguments of p with vars)::acc in
+    get_distinct_patterns acc' ps
+end
 
 
 (* [create_top_level_fun input_var [p0, ... pn] should logically create the expression
 
-   fun (e0, ..., en, e_default) -> match input_var with
-     | p0 -> e0
-     ...
-     | pn -> en
-     | _ -> e_default
-*)     
+ fun (e0, ..., en, e_default) -> match input_var with
+   | p0 -> e0
+   ...
+   | pn -> en
+   | _ -> e_default
+*)
 
 val create_top_level_fun : num -> list Cpat -> list Cexp -> Cexp
 
+let rec
+create_top_level_fun input_var [] [e] = e
+and
+create_top_level_fun input_var (PLit l::ps) (e::es) =
+CIf (CPrim2 CEq (CVar (Short input_var)) (CLit l))
+    e
+    (create_top_level_fun input_var ps es)
+and
+create_top_level_fun input_var (Pvar::ps) (e::es) = e
+and
+create_top_level_fun input_var (PCon c vs::ps) (e::es) =
+CIf (CTagEq (CVar(Short input_var)) c)
+  (CLet (CProj (CVar(Short input_var)) 0)
+     CLet (CProj (CVar(Short input_var)) 1)
+       ...
+       CLet (CProj (CVar(Short input_var)) (List.length vs))
+         e)
+  (create_top_level_fun input_var ps es)
+and
+create_top_level_fun input_var (Pref p::ps) (e::es) =
+CLet (CPrim1 CDer (CVar(Short input_var))) e
+
 
 (* [create_submatrix org_matrix input pats specialise_pat] specialises the matrix 
-   given by [org_matrix, input, pats] for inputs that match [specialise_pat]. I.e. 
+ given by [org_matrix, input, pats] for inputs that match [specialise_pat]. I.e. 
 
-   The semantics of [org_matrix, input, pats] is for extract_column. So given
-   that org_matrix uses prefixes p, v and e, input is input and pats are [q0,...qm] we have
+ The semantics of [org_matrix, input, pats] is for extract_column. So given
+ that org_matrix uses prefixes p, v and e, input is input and pats are [q0,...qm] we have
 
-       Matrix is_exn 
-          [v0, ..., vn, input] 
-          [MatrixRow ([p00, ..., p0n, q0], e0), 
-           ...
-           MatrixRow ([pm0, ..., pmn, qm], em)]
+     Matrix is_exn 
+        [v0, ..., vn, input] 
+        [MatrixRow ([p00, ..., p0n, q0], e0), 
+         ...
+         MatrixRow ([pm0, ..., pmn, qm], em)]
 
-   We then want a matrix m' such that informally the semantics of the input matrix above
-   is the same as of this informal expression provided input really matches [specialise_pat]. 
+ We then want a matrix m' such that informally the semantics of the input matrix above
+ is the same as of this informal expression provided input really matches [specialise_pat]. 
 
-      match input with 
-        | specialise_pat ->
-           (matrix_sem (Matrix is_exn 
-             [v0, ..., vn'] 
-              [MatrixRow ([p'00,  ..., p'0n',  q'0 ], e'0), 
-               ...
-               MatrixRow ([p'm'0, ..., p'm'n', q'm'], e'm')])))
+    match input with 
+      | specialise_pat ->
+         (matrix_sem (Matrix is_exn 
+           [v0, ..., vn'] 
+            [MatrixRow ([p'00,  ..., p'0n',  q'0 ], e'0), 
+             ...
+             MatrixRow ([p'm'0, ..., p'm'n', q'm'], e'm')])))
 
 *)   
 
 
-val match_pattern : Cpat -> Cpat -> option (list Cpat) 
+val match_pattern : Cpat -> Cpat -> option (list Cpat)
 
 let match_pattern select_pattern p = match (select_pattern, p) with
-  | (Plit sl, Plit l) -> 
-       (if sl = l then Some [] else None)
-  | (Pcon sc _, Pcon c args) -> 
-       (if sc = c then Some [args] else None)
-  | (Pref _, Pref p) -> Some [p]
-  | (_, Pvar) -> Some (List.replicate (arg_num select_pattern) Pvar)
-  | (_, _) ->  None
+| (Plit sl, Plit l) -> 
+     (if sl = l then Some [] else None)
+| (Pcon sc _, Pcon c args) -> 
+     (if sc = c then Some [args] else None)
+| (Pref _, Pref p) -> Some [p]
+| (_, Pvar) -> Some (List.replicate (arg_num select_pattern) Pvar)
+| (_, _) ->  None
 
 val create_submatrix : matrix -> num -> pat list -> pat -> matrix
 
 
+val get_number_of_argments : Cpat -> num
+let rec
+get_number_of_argments (Plit _) = 0
+and
+get_number_of_argments (Pvar) = 0
+and
+get_number_of_argments (Pcon _ vs) = List.length vs
+and
+get_number_of_argments (Pref _) = 1
+
+let rec
+process_row input rows ps = match (rows, ps) with
+   | ([], _) -> []
+   | (_, []) -> [] (* rows and ps should have the same length, so this case should not fire *)
+
+   | ((MatrixRow row_pats e) :: rows, p :: ps) ->
+        match (match_pattern sp p) with
+         | None -> process_rows rows ps
+         | Some extra_pats -> begin
+              (* if p is a variable pattern, then do the letbind on rhs and shift. 
+                 The problem is that var-patterns get expanded to multiple variable columns, while
+                 all other patterns just copy their arguments. *)
+              let row_pats' = row_pats ++ extra_pats in
+              (* for the shift: arg_num is new fresh variables *)
+              let e' = if isVar_pat p then shift arg_num (CLet (CVar(Short (input+(Cpat_vars_list row_pats')))) e) else e in
+              (MatrixRow row_pats' e')::process_rows rows ps
+         end
+   end
+
 let create_submatrix (Matrix is_exn vs rows) input ps sp =
-begin
-  let arg_num = get_number_of_argments of sp in
-
-  (* add extra input variables for the destructed arguments *)
-  let vs' = vs ++ [arg_num-1, ... 0] 
-  
-  let rec process_row rows ps = match (rows, ps) with 
-     | ([], _) -> []
-     | (_, []) -> [] (* rows and ps should have the same length, so this case should not fire *)
-
-     | ((MatrixRow row_pats e) :: rows, p :: ps) -> begin
-          match (match_pattern sp p) with
-           | None -> process_rows rows ps
-           | Some extra_pats -> begin
-                (* if p is a variable pattern, then do the letbind on rhs and shift. 
-                   The problem is that var-patterns get expanded to multiple variable columns, while
-                   all other patterns just copy their arguments. *)
-                let e' = if isVar_pat p then shift arg_num (Let input e) else e in
-                let row_pats' = row_pats ++ extra_pats in
-                (MatrixRow row_pats' e')::process_rows rows ps
-             end
-     end
-  end
-end
-
+ let arg_num = get_number_of_argments sp in
+ (* add extra input variables for the destructed arguments *)
+ let vs' = (List.map (add arg_num) vs) ++ [arg_num-1, ... 0] in
+ let rows' = process_row input rows ps in
+ let is_exn' = match is_exn with None -> None | Some n -> Some n - 1 + arg_num end in
+ Matrix is_exn' vs' rows'
 
 val compile_matrix_step : matrix -> list matrix * (list Cexp -> Cexp)
 let compile_matrix_step m =
@@ -238,20 +258,18 @@ let compile_matrix_step m =
      decomposition *)
   match try_matrix_to_Cexp m
   | Some e -> (* it's already simple enough, just return an expression *) ([],fun _ -> e)
-  | None -> begin
+  | None ->
       (* do further decomposition *)
-      
       let i = select_column m in
       let (m', input, pats) = extract_column i m in
 
       let cases = get_distinct_patterns pats in
 
       let top_level_fun = create_top_level_fun cases in
-      let ms = List.map (create_submatrix m' input pats) (cases ++ (* add catchall case *) [Pvar]) in
+      let ms = List.map (create_submatrix m' input pats) (cases @ (* add catchall case *) [Pvar]) in
 
       (ms, top_level_fun)
-   end
-
+  end
 
 let rec
 compile_matrix b m =
@@ -260,118 +278,3 @@ compile_matrix b m =
   | [] -> f []
   | ms -> let es = List.map (compile_matrix b) ms in f es
   end
-
-
-(* The new plan: 
-
-compile_match : bool -> Cexp -> list (Cpat * Cexp) -> Cexp
-  satisfying:
-    ∀b menv s env exp pes s' v env' e v'.
-      Cevaluate menv s env exp (s', Cval v) ∧
-      Cevaluate_match s' v pes env' (SOME e) ∧
-      Cevaluate menv s' (env' ++ env) e res
-      ⇒
-      Cevaluate menv s env (compile_match b exp pes) res
-  and
-    ∀b menv s env exp pes s' v .
-      Cevaluate menv s env exp (s', Cval v) ∧
-      Cevaluate_match s' v pes [] NONE
-      ⇒
-      Cevaluate menv s env (compile_match b exp pes)
-        (s', Cexc (Craise (if b then v else CBind_excv)))
-  and
-    ∀b menv s env exp pes s' v.
-      Cevaluate menv s env exp (s', Cexc v)
-      ⇒
-      Cevaluate menv s env (compile_match b exp pes) (s', Cexc v)
-*)
-
-(*
-The first plan:
-
-  Write
-
-  compile_match : exp -> list (pat * exp) -> exp
-
-  and prove that it satisfies
-
-  ∀e pes.
-    simple_matches_only e ∧
-    EVERY simple_matches_only (MAP SND pes)
-    ⇒
-    simple_matches_only (compile_match e pes)
-
-  and
-
-  ∀ck menv cenv s env res.
-    evaluate ck menv cenv s env (Mat e pes) res ⇒
-    evaluate ck menv cenv s env (compile_match e pes) res
-
-(* For reference:
-Handle e pes
-  should be equivalent to:
-Mat e (pes++[(Pvar"e", Raise(Var(Short"e")))])
-*)
-
-let rec
-simple_matches_only (Raise e) = simple_matches_only e
-and
-simple_matches_only (Handle e pes) =
-  simple_matches_only e &&
-  simple_matches_only_pes pes &&
-and
-simple_matches_only (Lit _) = true
-and
-simple_matches_only (Con n es) =
-  simple_matches_only_list es
-and
-simple_matches_only (Var _) = true
-and
-simple_matches_only (Fun _ e) = simple_matches_only e
-and
-simple_matches_only (Uapp _ e) = simple_matches_only e
-and
-simple_matches_only (App _ e1 e2) =
-  simple_matches_only e1 &&
-  simple_matches_only e2
-and
-simple_matches_only (Log _ e1 e2) =
-  simple_matches_only e1 &&
-  simple_matches_only e2
-and
-simple_matches_only (If e1 e2 e3) =
-  simple_matches_only e1 &&
-  simple_matches_only e2 &&
-  simple_matches_only e3
-and
-simple_matches_only (Mat e pes) =
-  simple_matches_only e &&
-  simple_matches_only_pes pes
-and
-simple_matches_only (Let _ e1 e2) =
-  simple_matches_only e1 &&
-  simple_matches_only e2
-and
-simple_matches_only (Letrec defs e) =
-  simple_matches_only_defs defs &&
-  simple_matches_only e
-and
-simple_matches_only_list [] = true
-and
-simple_matches_only_list (e::es) =
-  simple_matches_only e &&
-  simple_matches_only_list es
-and
-simple_matches_only_pes [] = true
-and
-simple_matches_only_pes ((p,e)::pes) =
-  (exists n vs.
-    p = Pcon n vs &&
-    forall v. List.mem v vs --> exists a. v = Pvar a) &&
-  simple_matches_only e &&
-  simple_matches_only_pes pes
-
-type match_matrix =
-  Matrix of list exp * list (list pat * exp)
-
-*)
