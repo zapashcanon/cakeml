@@ -331,7 +331,7 @@ val _=temp_add_user_printer ("pconnilprint",``Pcon (SOME (Short "nil")) y``,genP
 (*Literals*)
 (*Pattern lit*)
 fun plitPrint sys d t pg str brk blk=
-    sys (pg,pg,pg) (d-1) (strip (strip t));
+    sys (pg,pg,pg) d (strip t);
 
 val _=temp_add_user_printer("plitprint", ``Plit x``, genPrint plitPrint);
 val _=temp_add_user_printer ("litprint", ``Lit x``, genPrint plitPrint);
@@ -517,7 +517,19 @@ fun astlistPrint sys d t pg str brk blk =
 (*Fixed in latest ver of HOL*)
 val _=temp_add_user_printer("astlistprint",``x:prog``,genPrint astlistPrint);
 
-(*TODO: Word8*)
+fun intlitPrint sys d t pg str brk blk =
+  let val i = strip t in sys (pg,pg,pg) d i end
+
+val _ = temp_add_user_printer("intlitprint",``IntLit w``,genPrint intlitPrint);
+
+val _ = temp_add_user_printer("strlitprint",``StrLit w``,genPrint intlitPrint);
+
+fun word8Print sys d t pg str brk blk =
+  let val w = strip t
+      val w = (rhs o concl) (EVAL ``^(w) + 0w``)
+  in str ("0w"^ (Int.toString o wordsSyntax.uint_of_word) w) end
+
+val _ = temp_add_user_printer("word8print",``Word8 w``,genPrint word8Print);
 
 (*TODO: the remainder of this should really go into a miscPP file*)
 (*Pretty Printer specifics for globals, types & exceptions*)

@@ -80,7 +80,7 @@ val ex25 = allIntermediates ``"structure Nat :> sig val one:int; val zero:int en
 val ex26 = allIntermediates ``"structure Nat :> sig exception E end = struct exception E end; raise Nat.E;"``;
 
 (*Word8, broken*)
-val ex27 = allIntermediates ``"val x = 0wx5;"``;
+val ex27 = allIntermediates ``"val x = 0w256;"``;
 
 (*pretty print for brackets*)
 val ex28 = allIntermediates ``"val x = 1+2+3*4+5;"``;

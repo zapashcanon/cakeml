@@ -92,9 +92,11 @@ open HolKernel boolLib bossLib lcsymtacs replTheory
     local open tokenUtilsTheory in
       val () = computeLib.add_thms
       [isInt_def
+      ,isWord_def
       ,isTyvarT_def
       ,destStringT_def
       ,destIntT_def
+      ,destWordT_def
       ,destSymbolT_def
       ,destAlphaT_def
       ,destTOK_def
@@ -102,7 +104,6 @@ open HolKernel boolLib bossLib lcsymtacs replTheory
       ,destTyvarPT_def
       ,destLongidT_def
       ,isLongidT_def
-      ,isWhitespaceT_def
       ,isString_def
       ,isAlphaSym_def
       ,isSymbolT_def
