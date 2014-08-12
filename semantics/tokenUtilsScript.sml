@@ -21,6 +21,12 @@ val isString_def = Define`
 `;
 val _ = export_rewrites ["isString_def"]
 
+val isWord_def = Define`
+  isWord (WordT _) = T ∧
+  isWord _ = F
+`;
+val _ = export_rewrites ["isWord_def"]
+
 val isAlphaT_def = Define`
   isAlphaT (AlphaT s) = T ∧
   isAlphaT _ = F
@@ -39,11 +45,6 @@ val _ = export_rewrites ["isAlphaSym_def"]
 
 val isTyvarT_def = Define`isTyvarT (TyvarT _) = T ∧ isTyvarT _ = F`
 val _ = export_rewrites ["isTyvarT_def"]
-
-val isWhitespaceT_def = Define`
-  (isWhitespaceT (WhitespaceT _) ⇔ T) ∧
-  (isWhitespaceT _ ⇔ F)
-`
 
 val isLongidT_def = Define`
   (isLongidT (LongidT _ _) ⇔ T) ∧
@@ -92,4 +93,9 @@ val destStringT_def = Define`
 `;
 val _ = export_rewrites ["destStringT_def"]
 
+val destWordT_def = Define`
+  (destWordT (WordT w) = SOME w) ∧ 
+  (destWordT _ = NONE)
+`;
+val _ = export_rewrites ["destWordT_def"]
 val _ = export_theory()

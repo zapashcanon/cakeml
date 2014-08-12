@@ -105,7 +105,7 @@ val cmlG_def = mk_grammar_def ginfo
               s ∉ {"true"; "false"; "ref"; "nil"}}``) ;
  Vlist1 ::= V Vlist1 | V;
  Ebase ::= "(" Eseq ")" | Etuple | "(" ")" | FQV | ConstructorName | <IntT>
-        |  <StringT> | "let" LetDecs "in" Eseq "end" | "[" "]" | "[" Elist1 "]";
+        | <WordT> | <StringT> | "let" LetDecs "in" Eseq "end" | "[" "]" | "[" Elist1 "]";
  Eseq ::= E ";" Eseq | E;
  Etuple ::= "(" Elist2 ")";
  Elist2 ::= E "," Elist1;
@@ -143,7 +143,7 @@ val cmlG_def = mk_grammar_def ginfo
  LetDecs ::= LetDec LetDecs | ";" LetDecs | ;
 
  (* patterns *)
- Pbase ::= V | ConstructorName | <IntT> | <StringT> | Ptuple | "_"
+ Pbase ::= V | ConstructorName | <WordT> | <IntT> | <StringT> | Ptuple | "_"
         |  "[" "]" | "[" PatternList "]";
  Papp ::= ConstructorName Pbase | Pbase;
  Pattern ::= Papp "::" Pattern | Papp ;
