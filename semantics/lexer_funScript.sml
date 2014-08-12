@@ -15,6 +15,7 @@ open stringTheory stringLib listTheory tokensTheory ASCIInumbersTheory intLib;
 
 val _ = Hol_datatype `symbol = StringS of string
                              | NumberS of int
+                             | ByteS of word8
                              (* For identifier with a . in them *)
                              | LongS of string
                              | OtherS of string
@@ -99,6 +100,9 @@ val next_sym_def = tDefine "next_sym" `
   (next_sym (c::str) =
      if isSpace c then (* skip blank space *)
        next_sym str
+     else if isPREFIX "0w" (c::str) then 
+       let (n,rest) = read_while isDigit (TL str) [] in 
+         SOME (ByteS (n2w (num_from_dec_string n)), rest)
      else if isDigit c then (* read number *)
        let (n,rest) = read_while isDigit str [] in
          SOME (NumberS (&(num_from_dec_string (c::n))), rest)
@@ -202,7 +206,7 @@ val next_sym_LESS = store_thm("next_sym_LESS",
 
   EVAL ``next_sym "3 (* hi (* there \" *) *) ~4 \" (* *)\" <= ;; "``
   EVAL ``next_sym " (* hi (* there \" *) *) ~4 \" (* *)\" <= ;; "``
-
+  EVAL ``next_sym "0w5000000"``;
 *)
 
 val processIdent_def = Define `
@@ -280,6 +284,7 @@ val token_of_sym_def = Define `
     | NumberS i => IntT i
     | LongS s => let (s1,s2) = SPLITP (\x. x = #".") s in
                    LongidT s1 (case s2 of "" => "" | (c::cs) => cs)
+    | ByteS w => WordT w
     | OtherS s  => get_token s `;
 
 val next_token_def = Define `
@@ -316,6 +321,7 @@ val lexer_fun_def = tDefine "lexer_fun" `
     EVAL ``lexer_fun "'a 'b '2"``;
     EVAL ``lexer_fun "'"``
 
+    EVAL ``lexer_fun "val x = 0wx5;"``;
 *)
 
 val toplevel_semi_dex_def = Define`

@@ -1,20 +1,63 @@
+open import Lib
 open import Pervasives_extra
-(* Tokens for Standard ML.  NB, not all of them are used in CakeML *)
 type token =
-| WhitespaceT of nat | NewlineT | LexErrorT
-| HashT | LparT | RparT | StarT | CommaT | ArrowT | DotsT | ColonT | SealT
-| SemicolonT | EqualsT | DarrowT | LbrackT | RbrackT | UnderbarT | LbraceT
-| BarT | RbraceT | AndT | AndalsoT | AsT | CaseT | DatatypeT
-| ElseT | EndT | EqtypeT | ExceptionT | FnT | FunT | HandleT | IfT
-| InT | IncludeT | LetT | LocalT | OfT | OpT
-| OpenT | OrelseT | RaiseT | RecT | SharingT | SigT | SignatureT | StructT
-| StructureT | ThenT | TypeT | ValT | WhereT | WhileT | WithT | WithtypeT
-| IntT of integer
-| HexintT of string
-| RealT of string
-| StringT of string
-| CharT of string
-| TyvarT of string
 | AlphaT of string
-| SymbolT of string
+| AndT
+| AndalsoT
+| ArrowT
+| AsT
+| BarT
+| CaseT
+| ColonT
+| CommaT
+| DarrowT
+| DatatypeT
+| DotsT
+| ElseT
+| EndT
+| EqtypeT
+| EqualsT
+| ExceptionT
+| FnT
+| FunT
+| HandleT
+| HashT
+| IfT
+| InT
+| IncludeT
+| IntT of integer
+| LbraceT
+| LbrackT
+| LetT
+| LexErrorT
+| LocalT
 | LongidT of string * string
+| LparT
+| OfT
+| OpT
+| OpenT
+| OrelseT
+| RaiseT
+| RbraceT
+| RbrackT
+| RecT
+| RparT
+| SealT
+| SemicolonT
+| SharingT
+| SigT
+| SignatureT
+| StarT
+| StringT of string
+| StructT
+| StructureT
+| SymbolT of string
+| ThenT
+| TypeT
+| TyvarT of string
+| UnderbarT
+| ValT
+| WhereT
+| WithT
+| WithtypeT
+| WordT of word8
