@@ -2,7 +2,7 @@ open HolKernel Parse boolLib bossLib; val _ = new_theory "bvp";
 
 open pred_setTheory arithmeticTheory pairTheory listTheory combinTheory;
 open finite_mapTheory sumTheory relationTheory stringTheory optionTheory;
-open bytecodeTheory bvlTheory sptreeTheory lcsymtacs;
+open bytecodeTheory bvlTheory sptreeTheory lcsymtacs bviTheory;
 
 infix \\ val op \\ = op THEN;
 
@@ -44,7 +44,6 @@ val _ = Datatype `
            | MakeSpace num num_set
            | Raise num
            | Return num
-         (* | Handle num_set bvp_prog num num num_set bvp_prog *)
            | Tick `;
 
 (* --- Semantics of BVP --- *)
@@ -65,22 +64,16 @@ val _ = Datatype `
      ; output  : string
      ; space   : num |> `
 
-val spt_set_def = Define `
-  (spt_set f LN = LN) /\
-  (spt_set f (LS x) = LS (f x)) /\
-  (spt_set f (BN t1 t2) = BN (spt_set f t1) (spt_set f t2)) /\
-  (spt_set f (BS t1 x t2) = BS (spt_set f t1) (f x) (spt_set f t2))`;
-
-val bvp_to_bvl_def = Define `
-  (bvp_to_bvl:bvp_state->bvl_state) s =
+val bvp_to_bvi_def = Define `
+  (bvp_to_bvi:bvp_state->bvi_state) s =
     <| globals := s.globals
      ; refs := s.refs
      ; clock := s.clock
-     ; code := spt_set ARB s.code
+     ; code := spt_set (K ARB) s.code
      ; output := s.output |>`;
 
-val bvl_to_bvp_def = Define `
-  (bvl_to_bvp:bvl_state->bvp_state->bvp_state) s t =
+val bvi_to_bvp_def = Define `
+  (bvi_to_bvp:bvi_state->bvp_state->bvp_state) s t =
     t with <| globals := s.globals
             ; refs := s.refs
             ; clock := s.clock
@@ -110,9 +103,9 @@ val pEvalOp_def = Define `
   pEvalOp op vs (s:bvp_state) =
     case pEvalOpSpace op s of
     | NONE => NONE
-    | SOME s1 => (case bEvalOp op vs (bvp_to_bvl s1) of
+    | SOME s1 => (case iEvalOp op vs (bvp_to_bvi s1) of
                   | NONE => NONE
-                  | SOME (v,t) => SOME (v, bvl_to_bvp t s1))`
+                  | SOME (v,t) => SOME (v, bvi_to_bvp t s1))`
 
 val dec_clock_def = Define `
   dec_clock (s:bvp_state) = s with clock := s.clock - 1`;
@@ -312,12 +305,9 @@ val check_clock_IMP = prove(
 val pEvalOp_clock = store_thm("pEvalOp_clock",
   ``(pEvalOp op args s1 = SOME (res,s2)) ==> s2.clock <= s1.clock``,
   SIMP_TAC std_ss [pEvalOp_def,pEvalOpSpace_def,consume_space_def]
-  \\ REPEAT BasicProvers.FULL_CASE_TAC
-  \\ FULL_SIMP_TAC std_ss []
-  \\ IMP_RES_TAC bEvalOp_const
-  \\ FULL_SIMP_TAC (srw_ss()) [bvp_to_bvl_def]
-  \\ Q.SPEC_TAC (`s2`,`s2`)
-  \\ FULL_SIMP_TAC (srw_ss()) [bvl_to_bvp_def]);
+  \\ SRW_TAC [] [] \\ REPEAT (BasicProvers.FULL_CASE_TAC \\ fs [])
+  \\ IMP_RES_TAC iEvalOp_const \\ fs []
+  \\ fs [bvp_to_bvi_def,bvi_to_bvp_def] \\ SRW_TAC [] []);
 
 val pEval_clock = store_thm("pEval_clock",
   ``!xs s1 vs s2. (pEval (xs,s1) = (vs,s2)) ==> s2.clock <= s1.clock``,
