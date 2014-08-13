@@ -44,6 +44,7 @@ val _ = Hol_datatype `
 | LocalT
 | LongidT of string => string
 | LparT
+| NewlineT
 | OfT
 | OpT
 | OpenT
@@ -69,6 +70,7 @@ val _ = Hol_datatype `
 | UnderbarT
 | ValT
 | WhereT
+| WhitespaceT of num 
 | WithT
 | WithtypeT
 | WordT of word8`;

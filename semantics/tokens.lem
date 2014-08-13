@@ -33,6 +33,7 @@ type token =
 | LocalT
 | LongidT of string * string
 | LparT
+| NewlineT
 | OfT
 | OpT
 | OpenT
@@ -58,6 +59,7 @@ type token =
 | UnderbarT
 | ValT
 | WhereT
+| WhitespaceT of nat 
 | WithT
 | WithtypeT
 | WordT of word8
