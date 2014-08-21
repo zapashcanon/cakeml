@@ -7,30 +7,23 @@ open bytecodeLabelsTheory bytecodeTheory;
 
 val _ = new_theory "standalone_fun";
 
-(* unlabel_and_encode_def copied from repl_funScript.sml *)
-val unlabel_and_encode_def = Define`
-  unlabel_and_encode (len,labs) code =
-    let code = REVERSE code in
-    let labs = FUNION labs (collect_labels code len real_inst_length) in
-    let len = len + code_length real_inst_length code in
-    let code = inst_labels labs code in
-    ((len,labs),MAP bc_num code)`
-
 val standalone_to_bc_def = Define `
-standalone_to_bc ls is input =
+standalone_to_bc basis_code is input =
   case parse_prog (lexer_fun input) of
     | NONE => Failure "<parse error>\n"
     | SOME prog =>
         case infer_prog (is.inf_mdecls,is.inf_tdecls,is.inf_edecls)
-                        is.inf_tenvT is.inf_tenvM is.inf_tenvC is.inf_tenvE 
+                        is.inf_tenvT is.inf_tenvM is.inf_tenvC is.inf_tenvE
                         prog init_infer_state  of
            | (Failure _, _) => Failure "<type error>\n"
            | (Success _, _) =>
                let code = compile_prog is.comp_rs prog in
-                 Success (SND (unlabel_and_encode ls code))`;
+               let code = code_labels real_inst_length
+                           (initial_bc_state.code ++ (REVERSE (code ++ basis_code))) in
+                 Success code`;
 
 val basis_standalone_to_bc_def = Define `
-basis_standalone_to_bc input = standalone_to_bc ARB (FST (THE basis_env)) input`;
+basis_standalone_to_bc input = standalone_to_bc (SND (THE basis_env) ++ SND (THE prim_env)) (FST (THE basis_env)) input`;
 
 val _ = export_theory ();
 
