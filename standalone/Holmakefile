@@ -1,14 +1,20 @@
-INCLUDES = .. $(HOLDIR)/examples/parsing ../parsing ../semantics ../inference ../compiler ../bytecode ../compiler/proofs ../initial ../x86-64
+INCLUDES=.. $(HOLDIR)/examples/parsing .. ../semantics ../parsing ../inference ../compiler ../bytecode ../initial
 OPTIONS = QUIT_ON_FAILURE
 
 ifdef POLY
 HOLHEAP = heap
+PARENTHEAP = ../initial/heap
 EXTRA_CLEANS = $(HOLHEAP) $(HOLHEAP).o
 
-BARE_THYS = ../parsing/cmlParseTheory ../inference/inferTheory ../compiler/compilerTerminationTheory ../parsing/lexer_implTheory ../bytecode/bytecodeLabelsTheory ../semantics/typeSystemTheory ../semantics/lexer_funTheory ../compiler/proofs/compilerProofTheory ../initial/initCompEnvTheory
+SEM_BARE_THYS = astTheory \
+	        lexer_funTheory \
+	        typeSystemTheory
 
-DEPS = $(patsubst %,%.uo,$(BARE_THYS))
+BARE_THYS = $(patsubst %,../semantics/%,$(SEM_BARE_THYS)) ../parsing/cmlParseTheory ../inference/inferTheory ../compiler/compilerTerminationTheory ../bytecode/bytecodeEvalTheory ../initial/initCompEnvTheory
+
+DEPS = $(patsubst %,%.uo,$(BARE_THYS)) $(PARENTHEAP)
 
 $(HOLHEAP): $(DEPS)
-	$(protect $(HOLDIR)/bin/buildheap) -o $(HOLHEAP) $(BARE_THYS)
+	$(protect $(HOLDIR)/bin/buildheap) -b $(PARENTHEAP) -o $(HOLHEAP) $(BARE_THYS)
 endif
+
