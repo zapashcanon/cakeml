@@ -15,17 +15,12 @@ val OPTION_JOIN_EQ_NONE = Q.prove (
  Cases_on `x` >>
  rw []);
 
-(* install_bc_lists_def copied from repl_funScript.sml *)
-val install_bc_lists_def = Define `
-  install_bc_lists code bs =
-    install_code (REVERSE (MAP num_bc code)) bs`;
-
 val parse_correct = Q.prove (
 `!toks. parse toks = parse_prog toks`,
  cheat);
 
 val standalone_fun_correct = Q.store_thm ("standalone_fun_correct",
-`!sem_is is init_bc_state input. 
+`!sem_is is init_bc init_bc_state input. 
   infer_sound_invariant is.inf_tenvT is.inf_tenvM is.inf_tenvC is.inf_tenvE ∧
   type_sound_invariants NONE (sem_is.tdecs,
                               sem_is.tenvT,
@@ -45,11 +40,11 @@ val standalone_fun_correct = Q.store_thm ("standalone_fun_correct",
   ⇒
   standalone sem_is TYPE_ERROR_MASK input 
   = 
-  case standalone_to_bc SOMETHING_ABOUT_INIT_BC_LABELS is input of
+  case standalone_to_bc init_bc is input of
      | Failure s => 
          SOME s
      | Success code => 
-         case bc_eval (install_bc_lists code init_bc_state) of
+         case bc_eval (install_code code empty_bc_state) of
             | SOME bs => 
                 SOME bs.output
             | NONE => NONE`,
