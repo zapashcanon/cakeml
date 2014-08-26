@@ -4,6 +4,7 @@ val _ = new_theory "lexer_fun";
 
 open preamble;
 open stringTheory stringLib listTheory tokensTheory ASCIInumbersTheory intLib;
+open integer_wordTheory;
 
 (* This script defines the functional spec for the assmebly
    implementation of the lexer. This lexer specification consists of
@@ -12,14 +13,15 @@ open stringTheory stringLib listTheory tokensTheory ASCIInumbersTheory intLib;
    tokens. The implementation merges these two phases. *)
 
 (* intermediate symbols *)
-
-val _ = Hol_datatype `symbol = StringS of string
-                             | NumberS of int
-                             | ByteS of word8
+(*Commented Numbers are the tags used in the lexer impl*)
+val _ = Hol_datatype `symbol = StringS of string  (*Number 1*)
+                             | NumberS of int (*Number 3*) 
+                             | ByteS of int (*Number 6*)
                              (* For identifier with a . in them *)
-                             | LongS of string
-                             | OtherS of string
-                             | ErrorS `;
+                             | LongS of string (*Number 5*)
+                             | OtherS of string (*Number 4*)
+                             | ErrorS `; (*Number 0*)
+                             (*EOF : Number 2*) 
 
 (* helper functions *)
 
@@ -101,8 +103,9 @@ val next_sym_def = tDefine "next_sym" `
      if isSpace c then (* skip blank space *)
        next_sym str
      else if isPREFIX "0w" (c::str) then 
+       (*TODO: This has the weird effect of lexing the chars "0wabc" as ByteS 0 then whatever the remainder string is*)
        let (n,rest) = read_while isDigit (TL str) [] in 
-         SOME (ByteS (n2w (num_from_dec_string n)), rest)
+         SOME (ByteS (&(num_from_dec_string n)), rest)
      else if isDigit c then (* read number *)
        let (n,rest) = read_while isDigit str [] in
          SOME (NumberS (&(num_from_dec_string (c::n))), rest)
@@ -284,7 +287,7 @@ val token_of_sym_def = Define `
     | NumberS i => IntT i
     | LongS s => let (s1,s2) = SPLITP (\x. x = #".") s in
                    LongidT s1 (case s2 of "" => "" | (c::cs) => cs)
-    | ByteS w => WordT w
+    | ByteS w => WordT (i2w w)
     | OtherS s  => get_token s `;
 
 val next_token_def = Define `

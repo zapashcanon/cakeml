@@ -21,6 +21,8 @@ open addressTheory
 open x64_copying_gcTheory;
 open progTheory;
 
+(*blastLib intLib bytecodeLabelsTheory*)
+
 val _ = (max_print_depth := 50);
 
 infix \\ val op \\ = op THEN;
@@ -12596,7 +12598,7 @@ val read_num_thm = prove(
   \\ FULL_SIMP_TAC std_ss [AC MULT_COMM MULT_ASSOC, AC ADD_ASSOC ADD_COMM]);
 
 (* next symbol *)
-
+(*DIES HERE*)
 val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
   next_symbol (x1:bc_value,x2:bc_value,s:zheap_state,stack) =
     let stack = x1 :: stack in
@@ -12619,6 +12621,34 @@ val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
     else
     let (x1,s) = is_digit s in
     if getNumber x1 <> 0 then
+      if HD s.input = #"0" then
+        let s = s with input := DROP 1 s.input in
+        if s.input = "" then (*was a single 0 so it's a IntS*)
+          let x1 = Number 0 in
+          let stack = x1::stack in
+          let x2 = Number 3 in
+          let x1 = x2 in
+            (x1,x2,s,stack)
+        else if HD s.input = #"w" then (*TODO: 
+        I think this correctly follows the TODO note in lexer_funScript
+        since if the next symbol is not a digit then x2 is 0*)
+          let s = s with input := DROP 1 s.input in
+          let x1 = Number 0 in
+          let x2 = x1 in
+          let (x1,x2,s) = read_num (x1,x2,s) in
+          let stack = x2::stack in
+          let x2 = Number 6 in
+          let x1 = x2 in
+            (x1,x2,s,stack) 
+        else (*re-read the whole number..TODO:does 0 need to be put back on?*)
+          let x1 = Number 0 in
+          let x2 = x1 in
+          let (x1,x2,s) = read_num (x1,x2,s) in
+          let stack = x2::stack in
+          let x2 = Number 3 in
+          let x1 = x2 in
+            (x1,x2,s,stack)
+      else
       let x1 = Number 0 in
       let x2 = x1 in
       let (x1,x2,s) = read_num (x1,x2,s) in
@@ -12769,6 +12799,8 @@ val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
           let x1 = x2 in
             (x1,x2,s,stack)`
 
+PolyML.SaveState.saveState "x64_heap";
+
 val read_string_IMP = prove(
   ``!v x. (read_string v x = (res,r)) ==>
           (res = ErrorS) \/ ?s. res = StringS s``,
@@ -12845,7 +12877,9 @@ val next_symbol_thm = prove(
         | SOME (ErrorS, rest) =>
           (Number 0,Number 0,s with input := rest, MAP Chr (REVERSE ts) ++ stack)
         | SOME (NumberS n, rest) =>
-          (Number 3,Number 3,s with input := rest, Number n :: stack))``,
+          (Number 3,Number 3,s with input := rest, Number n :: stack)
+        | SOME (ByteS n,rest) =>
+          (Number 6,Number 6,s with input:=rest, Number n::stack))``,
   completeInduct_on `LENGTH s.input` \\ FULL_SIMP_TAC std_ss [PULL_FORALL]
   \\ REPEAT STRIP_TAC \\ FULL_SIMP_TAC std_ss [] \\ POP_ASSUM (K ALL_TAC)
   \\ Cases_on `s.input`
@@ -12869,7 +12903,14 @@ val next_symbol_thm = prove(
     \\ IMP_RES_TAC read_string_IMP
     \\ FULL_SIMP_TAC (srw_ss()) [isNumber_def] \\ METIS_TAC [])
   \\ Cases_on `isDigit h` \\ FULL_SIMP_TAC std_ss [] THEN1
-   (STRIP_ASSUME_TAC (LIST_PREFIX_PROP |> Q.SPECL [`h::v`,`isDigit`])
+   (
+    Cases_on`h = #"0"`\\ fs[] >- (
+      Cases_on`v = ""` >> fs[]>- (
+        fs[isNumber_def,EVAL ``bool2int T<0``,read_while_def]>>
+        simp[read_while_def]) >>
+      Cases_on`HD v = #"w"`>> cheat )>>
+        
+    STRIP_ASSUME_TAC (LIST_PREFIX_PROP |> Q.SPECL [`h::v`,`isDigit`])
     \\ FULL_SIMP_TAC std_ss []
     \\ `s = s with input := s.input` by FULL_SIMP_TAC std_ss [s_with_input]
     \\ POP_ASSUM (fn th => ONCE_REWRITE_TAC [th])
@@ -12880,7 +12921,8 @@ val next_symbol_thm = prove(
     \\ FULL_SIMP_TAC std_ss [isNumber_def,EVAL ``bool2int T < 0``]
     \\ Cases_on `xs1` \\ FULL_SIMP_TAC (srw_ss()) []
     THEN1 (Cases_on `xs2` \\ FULL_SIMP_TAC (srw_ss()) [])
-    \\ FULL_SIMP_TAC (srw_ss()) [read_while_APPEND])
+    \\ FULL_SIMP_TAC (srw_ss()) [read_while_APPEND]
+   )
   \\ Cases_on `h = #"'"` \\ FULL_SIMP_TAC (srw_ss()) [] THEN1
    (ASM_SIMP_TAC std_ss [read_anp_thm |> Q.SPEC `[]` |> RW [MAP,APPEND]]
     \\ SIMP_TAC std_ss [read_while_def,EVAL ``isAlphaNumPrime #"'"``]
@@ -12942,7 +12984,10 @@ val next_symbol_thm = prove(
       \\ IMP_RES_TAC LENGTH_skip_comment \\ DECIDE_TAC)
     \\ REPEAT STRIP_TAC \\ FULL_SIMP_TAC std_ss []
     \\ Q.EXISTS_TAC `ts` \\ FULL_SIMP_TAC (srw_ss()) [])
+(*HERE*)
   \\ Cases_on `is_single_char_symbol h`
+  \\ `h <> #"0"` by (SPOSE_NOT_THEN ASSUME_TAC>>
+                     fs[isDigit_def,EVAL ``ORD #"0"``])
   \\ FULL_SIMP_TAC (srw_ss()) [Chr_def,isNumber_def,EVAL ``bool2int T < 0``]
   \\ Cases_on `isSymbol h` \\ FULL_SIMP_TAC (srw_ss()) [Chr_def] THEN1
    (ASSUME_TAC (read_sym_thm |> Q.SPEC `[]` |> RW [MAP,APPEND,REVERSE_DEF])
