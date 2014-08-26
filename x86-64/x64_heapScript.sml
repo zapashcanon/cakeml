@@ -8672,6 +8672,7 @@ fun tag_for "nil" = ``2n``
   | tag_for "Longs" = ``10n``
   | tag_for "Numbers" = ``11n``
   | tag_for "Strings" = ``12n``
+  | tag_for "Bytes" = ``13n``
   | tag_for _ = failwith "tag_for"
 
 val nil_tag_def  = Define `nil_tag  = ^(tag_for "nil")`;
@@ -8697,12 +8698,14 @@ val others_tag_def  = Define `others_tag = ^(tag_for "Others")`;
 val longs_tag_def   = Define `longs_tag = ^(tag_for "Longs")`;
 val numbers_tag_def = Define `numbers_tag = ^(tag_for "Numbers")`;
 val strings_tag_def = Define `strings_tag = ^(tag_for "Strings")`;
+val bytes_tag_def = Define `bytes_tag = ^(tag_for "Bytes")`;
 
 val BlockOtherS_def  = Define `BlockOtherS x  = Block others_tag [x]`;
 val BlockLongS_def   = Define `BlockLongS x   = Block longs_tag [x]`;
 val BlockNumberS_def = Define `BlockNumberS x = Block numbers_tag [x]`;
 val BlockStringS_def = Define `BlockStringS x = Block strings_tag [x]`;
 val BlockErrorS_def  = Define `BlockErrorS    = Block errors_tag []`;
+val BlockByteS_def = Define `BlockByteS x = Block bytes_tag [x]`;
 
 val Chr_def = Define `Chr c = Number (& (ORD c))`;
 
@@ -8711,7 +8714,8 @@ val BlockSym_def = Define `
   (BlockSym (OtherS s) = BlockOtherS (BlockList (MAP Chr s))) /\
   (BlockSym (LongS s) = BlockLongS (BlockList (MAP Chr s))) /\
   (BlockSym (ErrorS) = BlockErrorS) /\
-  (BlockSym (NumberS n) = BlockNumberS (Number n))`;
+  (BlockSym (NumberS n) = BlockNumberS (Number n)) /\
+  (BlockSym (ByteS n) = BlockByteS (Number n))`;
 
 val BlockNum3_def = Define `
   BlockNum3 (x,y,z) =
@@ -8755,12 +8759,13 @@ fun Block1 tag = let
                             GSYM BlockLongS_def,
                             GSYM BlockOtherS_def,
                             GSYM BlockNumberS_def,
-                            GSYM BlockStringS_def]
+                            GSYM BlockStringS_def,
+                            GSYM BlockByteS_def]
   val _ = add_compiled [th]
   in th end
 
 val thms = map Block1
-  [`others_tag`, `longs_tag`, `numbers_tag`, `strings_tag`]
+  [`others_tag`, `longs_tag`, `numbers_tag`, `strings_tag`,`bytes_tag`]
 
 fun GenBlockNil tag th = let
   val th = th |> Q.INST [`k`|->tag]
@@ -12598,7 +12603,6 @@ val read_num_thm = prove(
   \\ FULL_SIMP_TAC std_ss [AC MULT_COMM MULT_ASSOC, AC ADD_ASSOC ADD_COMM]);
 
 (* next symbol *)
-(*DIES HERE*)
 val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
   next_symbol (x1:bc_value,x2:bc_value,s:zheap_state,stack) =
     let stack = x1 :: stack in
@@ -12629,8 +12633,9 @@ val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
           let x2 = Number 3 in
           let x1 = x2 in
             (x1,x2,s,stack)
-        else if HD s.input = #"w" then (*TODO: 
-        I think this correctly follows the TODO note in lexer_funScript
+        else if HD s.input = #"w" then 
+        (*TODO: 
+        I think this correctly follows the corresponding note in lexer_funScript
         since if the next symbol is not a digit then x2 is 0*)
           let s = s with input := DROP 1 s.input in
           let x1 = Number 0 in
@@ -12640,7 +12645,7 @@ val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
           let x2 = Number 6 in
           let x1 = x2 in
             (x1,x2,s,stack) 
-        else (*re-read the whole number..TODO:does 0 need to be put back on?*)
+        else (*re-read the whole number, ignoring the leading 0 is safe*)
           let x1 = Number 0 in
           let x2 = x1 in
           let (x1,x2,s) = read_num (x1,x2,s) in
@@ -12799,7 +12804,7 @@ val (res,next_symbol_def,next_symbol_pre_def) = x64_compile `
           let x1 = x2 in
             (x1,x2,s,stack)`
 
-PolyML.SaveState.saveState "x64_heap";
+(*PolyML.SaveState.saveState "x64_heap";*)
 
 val read_string_IMP = prove(
   ``!v x. (read_string v x = (res,r)) ==>
@@ -12908,8 +12913,29 @@ val next_symbol_thm = prove(
       Cases_on`v = ""` >> fs[]>- (
         fs[isNumber_def,EVAL ``bool2int T<0``,read_while_def]>>
         simp[read_while_def]) >>
-      Cases_on`HD v = #"w"`>> cheat )>>
-        
+      Cases_on`HD v = #"w"`>-
+      (*Parse word*)
+      (STRIP_ASSUME_TAC (LIST_PREFIX_PROP |> Q.SPECL [`TL v`,`isDigit`])>>
+      Cases_on`v`>>fs[]>>
+      ASSUME_TAC (GEN_ALL read_num_thm)>>
+      SEP_I_TAC "read_num">>
+      POP_ASSUM MP_TAC \\ FULL_SIMP_TAC std_ss [] \\ STRIP_TAC
+      \\ FULL_SIMP_TAC std_ss [isNumber_def,EVAL ``bool2int T < 0``]
+      \\ Cases_on `xs1` \\ FULL_SIMP_TAC (srw_ss()) []
+      THEN1 (Cases_on `xs2` \\ FULL_SIMP_TAC (srw_ss()) [read_while_def])
+      \\ FULL_SIMP_TAC (srw_ss()) [read_while_APPEND,read_while_def])>>
+      (*Parse int since it was just a 0 prefixed number..*)
+      STRIP_ASSUME_TAC (LIST_PREFIX_PROP |> Q.SPECL [`v`,`isDigit`])>>
+      Cases_on`v`>>fs[]>>
+      ASSUME_TAC (GEN_ALL read_num_thm)>>
+      SEP_I_TAC "read_num">>
+      POP_ASSUM MP_TAC \\ FULL_SIMP_TAC std_ss [] \\ STRIP_TAC
+      \\ FULL_SIMP_TAC std_ss [isNumber_def,EVAL ``bool2int T < 0``]
+      \\ Cases_on `xs1` \\ FULL_SIMP_TAC (srw_ss()) []
+      THEN1 (Cases_on `xs2` \\ FULL_SIMP_TAC (srw_ss()) [read_while_def])
+      \\ FULL_SIMP_TAC (srw_ss()) [read_while_APPEND,read_while_def]>>
+      fs[toNum_CONS])>>
+ 
     STRIP_ASSUME_TAC (LIST_PREFIX_PROP |> Q.SPECL [`h::v`,`isDigit`])
     \\ FULL_SIMP_TAC std_ss []
     \\ `s = s with input := s.input` by FULL_SIMP_TAC std_ss [s_with_input]
@@ -12984,7 +13010,6 @@ val next_symbol_thm = prove(
       \\ IMP_RES_TAC LENGTH_skip_comment \\ DECIDE_TAC)
     \\ REPEAT STRIP_TAC \\ FULL_SIMP_TAC std_ss []
     \\ Q.EXISTS_TAC `ts` \\ FULL_SIMP_TAC (srw_ss()) [])
-(*HERE*)
   \\ Cases_on `is_single_char_symbol h`
   \\ `h <> #"0"` by (SPOSE_NOT_THEN ASSUME_TAC>>
                      fs[isDigit_def,EVAL ``ORD #"0"``])
@@ -13198,7 +13223,7 @@ val semi_symbol_thm = prove(
 
 
 (* next symbol -- final package up *)
-
+(*blows up here*)
 val (res,next_sym_full_def,next_sym_full_pre_def) = x64_compile `
   next_sym_full (s,stack) =
     let x3 = Number 0 in
@@ -13232,6 +13257,12 @@ val (res,next_sym_full_def,next_sym_full_pre_def) = x64_compile `
       else if getNumber x1 = 3 then
         let (x1,stack) = (HD stack, TL stack) in
         let x1 = BlockNumberS x1 in
+        let (x2,stack) = (HD stack, TL stack) in
+        let x2 = Number 1 in
+          (x1,x2,x3,s,stack)
+      else if getNumber x1 = 6 then
+        let (x1,stack) = (HD stack, TL stack) in
+        let x1 = BlockByteS x1 in
         let (x2,stack) = (HD stack, TL stack) in
         let x2 = Number 1 in
           (x1,x2,x3,s,stack)
