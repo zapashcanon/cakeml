@@ -32,6 +32,7 @@ val _ = Datatype `
   word_exp = Const ('a word)
            | Var num
            | Get store_name
+           | Load word_exp
            | Op word_op (word_exp list)
            | Shift word_sh word_exp ('a num_exp)`
 
@@ -47,7 +48,7 @@ val _ = Datatype `
                  ((num # word_prog) option) (* handler: varname, handler code *)
             | Seq word_prog word_prog
             | If word_prog num word_prog word_prog
-            | Alloc ('a word_exp) num_set
+            | Alloc num num_set
             | Raise num
             | Return num
             | Tick `;
@@ -105,6 +106,18 @@ val is_word_def = Define `
 val get_word_def = Define `
   get_word (Word w) = w`
 
+val mem_store_def = Define `
+  mem_store (addr:'a word) (w:'a word_loc) (s:'a word_state) =
+    if addr IN s.mdomain then
+      SOME (s with memory := (addr =+ w) s.memory)
+    else NONE`
+
+val mem_load_def = Define `
+  mem_load (addr:'a word) (s:'a word_state) =
+    if addr IN s.mdomain then
+      SOME (s.memory addr)
+    else NONE`
+
 val word_op_def = Define `
   word_op op (ws:('a word) list) =
     case (op,ws) of
@@ -139,6 +152,12 @@ val word_exp_def = tDefine "word_exp" `
   (word_exp s (Get name) =
      case FLOOKUP s.store name of
      | SOME (Word w) => SOME w
+     | _ => NONE) /\
+  (word_exp s (Load addr) =
+     case word_exp s addr of
+     | SOME w => (case mem_load w s of
+                  | SOME (Word w) => SOME w
+                  | _ => NONE)
      | _ => NONE) /\
   (word_exp s (Op op wexps) =
      let ws = MAP (word_exp s) wexps in
@@ -203,9 +222,29 @@ val check_clock_lemma = prove(
           ((check_clock s1 s).clock = s.clock) /\ b)``,
   SRW_TAC [] [check_clock_def] \\ DECIDE_TAC);
 
+val fromList2_def = Define `
+  fromList2 l = SND (FOLDL (\(i,t) a. (i + 2,insert i a t)) (0,LN) l)`
+
+val EVEN_fromList2_lemma = prove(
+  ``!l n t.
+      EVEN n /\ (!x. x IN domain t ==> EVEN x) ==>
+      !x. x IN domain (SND (FOLDL (\(i,t) a. (i + 2,insert i a t)) (n,t) l)) ==> EVEN x``,
+  Induct \\ fs [FOLDL] \\ REPEAT STRIP_TAC \\ fs [PULL_FORALL]
+  \\ FIRST_X_ASSUM (MP_TAC o Q.SPECL [`n+2`,`insert n h t`,`x`])
+  \\ fs [] \\ SRW_TAC [] [] \\ POP_ASSUM MATCH_MP_TAC
+  \\ REPEAT STRIP_TAC \\ fs [] \\ fs [EVEN_EXISTS]
+  \\ Q.EXISTS_TAC `SUC m` \\ DECIDE_TAC);
+
+val EVEN_fromList2 = store_thm("EVEN_fromList2",
+  ``!l n. n IN domain (fromList2 l) ==> EVEN n``,
+  ASSUME_TAC (EVEN_fromList2_lemma
+    |> Q.SPECL [`l`,`0`,`LN`]
+    |> SIMP_RULE (srw_ss()) [GSYM fromList2_def]
+    |> GEN_ALL) \\ fs []);
+
 val call_env_def = Define `
   call_env args (s:'a word_state) =
-    s with <| locals := fromList args |>`;
+    s with <| locals := fromList2 args |>`;
 
 val env_to_list_def = Define `
   env_to_list env (bij_seq:num->num->num) =
@@ -217,7 +256,7 @@ val env_to_list_def = Define `
 
 val push_env_def = Define `
   push_env env b s =
-    let (l,permute) = env_to_list s.locals s.permute in
+    let (l,permute) = env_to_list env s.permute in
     let handler = if b then SOME s.handler else NONE in
       s with <| stack := StackFrame l handler :: s.stack
               ; permute := permute
@@ -275,12 +314,6 @@ val push_env_clock = prove(
   \\ REPEAT BasicProvers.FULL_CASE_TAC \\ fs []
   \\ SRW_TAC [] [] \\ fs []);
 
-val mem_store_def = Define `
-  mem_store (addr:'a word) (w:'a word_loc) (s:'a word_state) =
-    if addr IN s.mdomain then
-      SOME (s with memory := (addr =+ w) s.memory)
-    else NONE`
-
 val find_code_def = Define `
   (find_code (SOME p) args code =
      case sptree$lookup p code of
@@ -311,7 +344,7 @@ val dec_stack_def = Define `
        | NONE => NONE
        | SOME s => SOME (StackFrame (ZIP (MAP FST l,ws)) handler :: s))`
 
-val wGC_def = Define `
+val wGC_def = Define `  (* wGC runs the garbage collector algorithm *)
   wGC s =
     let wl_list = enc_stack s.stack in
       case s.gc_fun (wl_list, s.memory, s.mdomain, s.store) of
@@ -332,30 +365,36 @@ val has_space_def = Define `
 
 val wAlloc_def = Define `
   wAlloc w names s =
+    (* prune local names *)
     case cut_env names s.locals of
     | NONE => (SOME Error,s)
     | SOME env =>
+     (* perform garbage collection *)
      (case wGC (push_env env F (set_store AllocSize (Word w) s)) of
       | NONE => (SOME Error,s)
       | SOME s1 =>
-       (case FLOOKUP s.store AllocSize of
+       (* restore local variables *)
+       (case pop_env s of
         | NONE => (SOME Error, s)
-        | SOME w =>
-         (case has_space w s of
+        | SOME s =>
+         (* read how much space should be allocated *)
+         (case FLOOKUP s.store AllocSize of
           | NONE => (SOME Error, s)
-          | SOME T => (NONE,s)
-          | SOME F => (SOME NotEnoughSpace,s1))))`
+          | SOME w =>
+           (* check how much space there is *)
+           (case has_space w s of
+            | NONE => (SOME Error, s)
+            | SOME T => (* success there is that much space *)
+                        (NONE,s)
+            | SOME F => (* fail, GC didn't free up enough space *)
+                        (SOME NotEnoughSpace,s1)))))`
 
 val wEval_def = tDefine "wEval" `
   (wEval (Skip:'a word_prog,s) = (NONE,s:'a word_state)) /\
-  (wEval (Alloc exp names,s) =
-     case word_exp s exp of
-     | NONE => (SOME Error, s)
-     | SOME w =>
-      (case has_space (Word w) s of
-       | NONE => (SOME Error, s)
-       | SOME T => (NONE,s)
-       | SOME F => wAlloc w names s)) /\
+  (wEval (Alloc n names,s) =
+     case get_var n s of
+     | SOME (Word w) => wAlloc w names s
+     | _ => (SOME Error,s)) /\
   (wEval (Move moves,s) =
      if ALL_DISTINCT (MAP FST moves) then
        case get_vars (MAP SND moves) s of
@@ -466,10 +505,12 @@ val wAlloc_clock = store_thm("wAlloc_clock",
   SIMP_TAC std_ss [wAlloc_def] \\ REPEAT STRIP_TAC
   \\ REPEAT BasicProvers.FULL_CASE_TAC \\ SRW_TAC [] [] \\ fs []
   \\ REPEAT BasicProvers.FULL_CASE_TAC \\ SRW_TAC [] [] \\ fs []
+  \\ REPEAT BasicProvers.FULL_CASE_TAC \\ SRW_TAC [] [] \\ fs []
+  \\ REPEAT BasicProvers.FULL_CASE_TAC \\ SRW_TAC [] [] \\ fs []
   \\ POP_ASSUM MP_TAC \\ SRW_TAC [] []
-  \\ IMP_RES_TAC wGC_clock
-  \\ fs [push_env_def,set_store_def,pop_env_def] \\ SRW_TAC [] []
- \\  Cases_on `env_to_list s1.locals s1.permute` \\ fs [LET_DEF]);
+  \\ IMP_RES_TAC pop_env_clock \\ IMP_RES_TAC wGC_clock
+  \\ fs [push_env_clock,set_store_def] \\ SRW_TAC [] []
+  \\ Cases_on `env_to_list s1.locals s1.permute` \\ fs [LET_DEF]);
 
 val pop_env_clock = prove(
   ``(pop_env s = SOME t) ==> (s.clock = t.clock)``,

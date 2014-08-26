@@ -252,12 +252,17 @@ val _ = Define `
     | (Opassign, [Tapp [t1] TC_ref; t2]) => (t1 = t2) /\ (t = Tunit)
     | (Opref, [t1]) => (t = Tapp [t1] TC_ref)
     | (Opderef, [Tapp [t1] TC_ref]) => (t = t1)
-    | (Aalloc, [Tapp [] TC_int; Tapp [] TC_word8]) => (t = Tapp [] TC_word8array)
-    | (Asub, [Tapp [] TC_word8array; Tapp [] TC_int]) => (t = Tapp [] TC_word8)
-    | (Alength, [Tapp [] TC_word8array]) => (t = Tapp [] TC_int)
-    | (Aupdate, [Tapp [] TC_word8array; Tapp [] TC_int; Tapp [] TC_word8]) => t = Tapp [] TC_unit
+    | (Aw8alloc, [Tapp [] TC_int; Tapp [] TC_word8]) => (t = Tapp [] TC_word8array)
+    | (Aw8sub, [Tapp [] TC_word8array; Tapp [] TC_int]) => (t = Tapp [] TC_word8)
+    | (Aw8length, [Tapp [] TC_word8array]) => (t = Tapp [] TC_int)
+    | (Aw8update, [Tapp [] TC_word8array; Tapp [] TC_int; Tapp [] TC_word8]) => t = Tapp [] TC_unit
     | (VfromList, [Tapp [t1] (TC_name (Short "list"))]) => t = Tapp [t1] TC_vector
     | (Vsub, [Tapp [t1] TC_vector; Tapp [] TC_int]) => t = t1
+    | (Vlength, [Tapp [t1] TC_vector]) => (t = Tapp [] TC_int)
+    | (Aalloc, [Tapp [] TC_int; t1]) => t = Tapp [t1] TC_array
+    | (Asub, [Tapp [t1] TC_array; Tapp [] TC_int]) => t = t1
+    | (Alength, [Tapp [t1] TC_array]) => t = Tapp [] TC_int
+    | (Aupdate, [Tapp [t1] TC_array; Tapp [] TC_int; t2]) => (t1 = t2) /\ (t = Tapp [] TC_unit)
     | _ => F
   )))`;
 
@@ -535,22 +540,25 @@ type_e menv cenv tenv (If e1 e2 e3) t)
 ==>
 type_e menv cenv tenv (Mat e pes) t2)
 
-/\ (! menv cenv tenv n e1 e2 t1 t2 tvs.
-(is_value e1 /\
-type_e menv cenv (bind_tvar tvs tenv) e1 t1 /\
-type_e menv cenv (opt_bind_tenv n tvs t1 tenv) e2 t2)
-==>
-type_e menv cenv tenv (Let n e1 e2) t2)
-
 /\ (! menv cenv tenv n e1 e2 t1 t2.
 (type_e menv cenv tenv e1 t1 /\
 type_e menv cenv (opt_bind_tenv n( 0) t1 tenv) e2 t2)
 ==>
 type_e menv cenv tenv (Let n e1 e2) t2)
 
-/\ (! menv cenv tenv funs e t tenv' tvs.
-(type_funs menv cenv (bind_var_list( 0) tenv' (bind_tvar tvs tenv)) funs tenv' /\
-type_e menv cenv (bind_var_list tvs tenv' tenv) e t)
+(*
+and
+
+letrec : forall menv cenv tenv funs e t tenv' tvs.
+type_funs menv cenv (bind_var_list 0 tenv' (bind_tvar tvs tenv)) funs tenv' &&
+type_e menv cenv (bind_var_list tvs tenv' tenv) e t
+==>
+type_e menv cenv tenv (Letrec funs e) t
+*)
+
+/\ (! menv cenv tenv funs e t tenv'.
+(type_funs menv cenv (bind_var_list( 0) tenv' tenv) funs tenv' /\
+type_e menv cenv (bind_var_list( 0) tenv' tenv) e t)
 ==>
 type_e menv cenv tenv (Letrec funs e) t)
 
