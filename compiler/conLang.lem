@@ -426,6 +426,10 @@ let do_app_i2 s op vs =
           | _ -> Nothing
         end
     | (Init_global_var_i2 idx, _) -> Nothing
+    | (Op_i2 W8fromInt, [Litv_i2 (IntLit n)]) ->
+        Just (s, Rval (Litv_i2 (Word8 (word8FromInteger n))))
+    | (Op_i2 W8toInt, [Litv_i2 (Word8 w)]) ->
+        Just (s, Rval (Litv_i2 (IntLit (integerFromNat (natFromWord8 w)))))
     | (Op_i2 Aw8alloc, [Litv_i2 (IntLit n); Litv_i2 (Word8 w)]) ->
         if n < 0 then
           Just (s, Rerr (Rraise (prim_exn_i2 subscript_tag "Subscript")))

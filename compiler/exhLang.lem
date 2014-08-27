@@ -358,6 +358,10 @@ let do_app_exh ((count,s),genv) op vs =
           end
         else
           Nothing
+    | (Op_i2 W8fromInt, [Litv_exh (IntLit n)]) ->
+        Just (((count,s),genv), Rval (Litv_exh (Word8 (word8FromInteger n))))
+    | (Op_i2 W8toInt, [Litv_exh (Word8 w)]) ->
+        Just (((count,s),genv), Rval (Litv_exh (IntLit (integerFromNat (natFromWord8 w)))))
     | (Op_i2 Aw8alloc, [Litv_exh (IntLit n); Litv_exh (Word8 w)]) ->
         if n < 0 then
           Just (((count,s),genv), Rerr (Rraise (prim_exn_exh subscript_tag)))

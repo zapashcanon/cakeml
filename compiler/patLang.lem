@@ -14,6 +14,7 @@
 open import Pervasives
 open import SemanticPrimitives
 open import Ast
+open import Lib
 open import BigStep
 open import ExhLang
 open import ConLang
@@ -461,6 +462,10 @@ let do_app_pat ((cnt,s),genv) op vs =
           end
         else
           Nothing
+    | (Op_pat (Op_i2 W8fromInt), [Litv_pat (IntLit n)]) ->
+        Just (((cnt,s),genv), Rval (Litv_pat (Word8 (word8FromInteger n))))
+    | (Op_pat (Op_i2 W8toInt), [Litv_pat (Word8 w)]) ->
+        Just (((cnt,s),genv), Rval (Litv_pat (IntLit (integerFromNat (natFromWord8 w)))))
     | (Op_pat (Op_i2 Aw8alloc), [Litv_pat (IntLit n); Litv_pat (Word8 w)]) ->
         if n < 0 then
           Just (((cnt,s),genv), Rerr (Rraise (prim_exn_pat subscript_tag)))

@@ -7,28 +7,6 @@ val _ = new_theory"free_vars"
 
 (* TODO: move? *)
 
-val do_app_cases = store_thm("do_app_cases",
-  ``do_app s op vs = SOME x ⇒
-    (∃z n1 n2. op = Opn z ∧ vs = [Litv (IntLit n1); Litv (IntLit n2)]) ∨
-    (∃z n1 n2. op = Opb z ∧ vs = [Litv (IntLit n1); Litv (IntLit n2)]) ∨
-    (∃v1 v2. op = Equality ∧ vs = [v1; v2]) ∨
-    (∃lnum v. op = Opassign ∧ vs = [Loc lnum; v]) ∨
-    (∃n. op = Opderef ∧ vs = [Loc n]) ∨
-    (∃v. op = Opref ∧ vs = [v]) ∨
-    (∃n w. op = Aw8alloc ∧ vs = [Litv (IntLit n); Litv (Word8 w)]) ∨
-    (∃lnum i. op = Aw8sub ∧ vs = [Loc lnum; Litv (IntLit i)]) ∨
-    (∃n. op = Aw8length ∧ vs = [Loc n]) ∨
-    (∃lnum i w. op = Aw8update ∧ vs = [Loc lnum; Litv (IntLit i); Litv (Word8 w)]) ∨
-    (∃v ls. op = VfromList ∧ vs = [v] ∧ v_to_list v = SOME ls) ∨
-    (∃ls i. op = Vsub ∧ vs = [Vectorv ls; Litv (IntLit i)]) ∨
-    (∃ls. op = Vlength ∧ vs = [Vectorv ls]) ∨
-    (∃n v. op = Aalloc ∧ vs = [Litv (IntLit n); v]) ∨
-    (∃lnum i. op = Asub ∧ vs = [Loc lnum; Litv (IntLit i)]) ∨
-    (∃n. op = Alength ∧ vs = [Loc n]) ∨
-    (∃lnum i v. op = Aupdate ∧ vs = [Loc lnum; Litv (IntLit i); v])``,
-  rw[do_app_def] >>
-  BasicProvers.EVERY_CASE_TAC >> fs[])
-
 val do_app_i1_cases = store_thm("do_app_i1_cases",
   ``do_app_i1 s op vs = SOME x ⇒
     (∃z n1 n2. op = Opn z ∧ vs = [Litv_i1 (IntLit n1); Litv_i1 (IntLit n2)]) ∨
@@ -37,6 +15,8 @@ val do_app_i1_cases = store_thm("do_app_i1_cases",
     (∃lnum v. op = Opassign ∧ vs = [Loc_i1 lnum; v]) ∨
     (∃n. op = Opderef ∧ vs = [Loc_i1 n]) ∨
     (∃v. op = Opref ∧ vs = [v]) ∨
+    (∃i. op = W8fromInt ∧ vs = [Litv_i1 (IntLit i)]) ∨
+    (∃w. op = W8toInt ∧ vs = [Litv_i1 (Word8 w)]) ∨
     (∃n w. op = Aw8alloc ∧ vs = [Litv_i1 (IntLit n); Litv_i1 (Word8 w)]) ∨
     (∃lnum i. op = Aw8sub ∧ vs = [Loc_i1 lnum; Litv_i1 (IntLit i)]) ∨
     (∃n. op = Aw8length ∧ vs = [Loc_i1 n]) ∨
@@ -1074,7 +1054,7 @@ val do_app_closed = store_thm("do_app_closed",
     ⇒ every_result closed closed res ∧
       EVERY (sv_every closed) s'``,
   rpt gen_tac >> strip_tac >>
-  imp_res_tac do_app_cases >> fs[do_app_def] >>
+  imp_res_tac evalPropsTheory.do_app_cases >> fs[do_app_def] >>
   rpt BasicProvers.VAR_EQ_TAC >> simp[] >>
   fs[store_assign_def,store_alloc_def,store_lookup_def,LET_THM] >>
   rpt BasicProvers.VAR_EQ_TAC >> simp[] >>

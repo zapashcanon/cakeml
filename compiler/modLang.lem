@@ -358,6 +358,10 @@ let do_app_i1 s op vs =
           | Just (Refv v) -> Just (s,Rval v)
           | _ -> Nothing
         end
+    | (W8fromInt, [Litv_i1 (IntLit n)]) ->
+        Just (s, Rval (Litv_i1 (Word8 (word8FromInteger n))))
+    | (W8toInt, [Litv_i1 (Word8 w)]) ->
+        Just (s, Rval (Litv_i1 (IntLit (integerFromNat (natFromWord8 w)))))
     | (Aw8alloc, [Litv_i1 (IntLit n); Litv_i1 (Word8 w)]) ->
         if n < 0 then
           Just (s, Rerr (Rraise (prim_exn_i1 "Subscript")))

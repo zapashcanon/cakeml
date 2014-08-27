@@ -507,6 +507,10 @@ val _ = Define `
           | _ => NONE
         )
     | (Init_global_var_i2 idx, _) => NONE
+    | (Op_i2 W8fromInt, [Litv_i2 (IntLit n)]) =>
+        SOME (s, Rval (Litv_i2 (Word8 (i2w n))))
+    | (Op_i2 W8toInt, [Litv_i2 (Word8 w)]) =>
+        SOME (s, Rval (Litv_i2 (IntLit (int_of_num (w2n w)))))
     | (Op_i2 Aw8alloc, [Litv_i2 (IntLit n); Litv_i2 (Word8 w)]) =>
         if n <( 0 : int) then
           SOME (s, Rerr (Rraise (prim_exn_i2 subscript_tag "Subscript")))

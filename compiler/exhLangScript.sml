@@ -405,6 +405,10 @@ val _ = Define `
           )
         else
           NONE
+    | (Op_i2 W8fromInt, [Litv_exh (IntLit n)]) =>
+        SOME (((count,s),genv), Rval (Litv_exh (Word8 (i2w n))))
+    | (Op_i2 W8toInt, [Litv_exh (Word8 w)]) =>
+        SOME (((count,s),genv), Rval (Litv_exh (IntLit (int_of_num (w2n w)))))
     | (Op_i2 Aw8alloc, [Litv_exh (IntLit n); Litv_exh (Word8 w)]) =>
         if n <( 0 : int) then
           SOME (((count,s),genv), Rerr (Rraise (prim_exn_exh subscript_tag)))

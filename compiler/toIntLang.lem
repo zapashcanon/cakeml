@@ -189,6 +189,10 @@ and
 binop_to_il Opderef   Ce1 Ce2 = CCon tuple_tag [Ce1;Ce2] (* should not happen *)
 and
 binop_to_il VfromList Ce1 Ce2 = CCon tuple_tag [Ce1;Ce2] (* should not happen *)
+and
+binop_to_il W8fromInt Ce1 Ce2 = CCon tuple_tag [Ce1;Ce2] (* should not happen *)
+and
+binop_to_il W8toInt   Ce1 Ce2 = CCon tuple_tag [Ce1;Ce2] (* should not happen *)
 
 let rec
 unop_to_il Opref Ce = CPrim1 CRef Ce
@@ -202,6 +206,10 @@ and
 unop_to_il Alength Ce = CPrim1 CLen Ce
 and
 unop_to_il VfromList Ce = CPrim1 CVfromList Ce
+and
+unop_to_il W8fromInt Ce = Ce (* TODO *)
+and
+unop_to_il W8toInt Ce = Ce (* TODO *)
 and
 unop_to_il (Opn _)   Ce = Ce (* should not happen *)
 and

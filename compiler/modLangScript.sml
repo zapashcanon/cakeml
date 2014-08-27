@@ -405,6 +405,10 @@ val _ = Define `
             SOME (Refv v) => SOME (s,Rval v)
           | _ => NONE
         )
+    | (W8fromInt, [Litv_i1 (IntLit n)]) =>
+        SOME (s, Rval (Litv_i1 (Word8 (i2w n))))
+    | (W8toInt, [Litv_i1 (Word8 w)]) =>
+        SOME (s, Rval (Litv_i1 (IntLit (int_of_num (w2n w)))))
     | (Aw8alloc, [Litv_i1 (IntLit n); Litv_i1 (Word8 w)]) =>
         if n <( 0 : int) then
           SOME (s, Rerr (Rraise (prim_exn_i1 "Subscript")))

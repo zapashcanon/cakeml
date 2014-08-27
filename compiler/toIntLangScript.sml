@@ -209,7 +209,11 @@ val _ = Define `
 /\
 (binop_to_il Opderef   Ce1 Ce2 = (CCon tuple_tag [Ce1;Ce2])) (* should not happen *)
 /\
-(binop_to_il VfromList Ce1 Ce2 = (CCon tuple_tag [Ce1;Ce2]))`;
+(binop_to_il VfromList Ce1 Ce2 = (CCon tuple_tag [Ce1;Ce2])) (* should not happen *)
+/\
+(binop_to_il W8fromInt Ce1 Ce2 = (CCon tuple_tag [Ce1;Ce2])) (* should not happen *)
+/\
+(binop_to_il W8toInt   Ce1 Ce2 = (CCon tuple_tag [Ce1;Ce2]))`;
  (* should not happen *)
 
  val _ = Define `
@@ -225,6 +229,10 @@ val _ = Define `
 (unop_to_il Alength Ce = (CPrim1 CLen Ce))
 /\
 (unop_to_il VfromList Ce = (CPrim1 CVfromList Ce))
+/\
+(unop_to_il W8fromInt Ce = Ce) (* TODO *)
+/\
+(unop_to_il W8toInt Ce = Ce) (* TODO *)
 /\
 (unop_to_il (Opn _)   Ce = Ce) (* should not happen *)
 /\

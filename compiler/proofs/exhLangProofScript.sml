@@ -497,6 +497,8 @@ val do_app_i2_cases = Q.store_thm("do_app_i2_cases",
     (∃lnum v. op = (Op_i2 Opassign) ∧ vs = [Loc_i2 lnum; v]) ∨
     (∃n. op = (Op_i2 Opderef) ∧ vs = [Loc_i2 n]) ∨
     (∃v. op = (Op_i2 Opref) ∧ vs = [v]) ∨
+    (∃i. op = (Op_i2 W8fromInt) ∧ vs = [Litv_i2 (IntLit i)]) ∨
+    (∃w. op = (Op_i2 W8toInt) ∧ vs = [Litv_i2 (Word8 w)]) ∨
     (∃n w. op = (Op_i2 Aw8alloc) ∧ vs = [Litv_i2 (IntLit n); Litv_i2 (Word8 w)]) ∨
     (∃lnum i. op = (Op_i2 Aw8sub) ∧ vs = [Loc_i2 lnum; Litv_i2 (IntLit i)]) ∨
     (∃n. op = (Op_i2 Aw8length) ∧ vs = [Loc_i2 n]) ∨
@@ -509,7 +511,7 @@ val do_app_i2_cases = Q.store_thm("do_app_i2_cases",
     (∃n. op = (Op_i2 Alength) ∧ vs = [Loc_i2 n]) ∨
     (∃lnum i v. op = (Op_i2 Aupdate) ∧ vs = [Loc_i2 lnum; Litv_i2 (IntLit i); v])`,
   rw[do_app_i2_def] >>
-  every_case_tac >> 
+  every_case_tac >>
   fs[]);
 
 val tac =
@@ -555,6 +557,8 @@ val do_app_exh_i2 = Q.prove (
          prim_exn_i2_def, prim_exn_exh_def, v_to_exh_eqn])
  >- (tac >>
      metis_tac [v_to_exh_eqn, store_v_distinct, sv_to_exh_def])
+ >- tac
+ >- tac
  >- tac
  >- tac
  >- tac

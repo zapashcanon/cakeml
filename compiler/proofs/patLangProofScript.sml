@@ -223,6 +223,8 @@ val do_app_exh_cases = Q.store_thm("do_app_exh_cases",
     (∃n. op = (Op_i2 Opderef) ∧ vs = [Loc_exh n]) ∨
     (∃v. op = (Op_i2 Opref) ∧ vs = [v]) ∨
     (∃idx v. op = (Init_global_var_i2 idx) ∧ vs = [v]) ∨
+    (∃i. op = (Op_i2 W8fromInt) ∧ vs = [Litv_exh (IntLit i)]) ∨
+    (∃w. op = (Op_i2 W8toInt) ∧ vs = [Litv_exh (Word8 w)]) ∨
     (∃n w. op = (Op_i2 Aw8alloc) ∧ vs = [Litv_exh (IntLit n); Litv_exh (Word8 w)]) ∨
     (∃lnum i. op = (Op_i2 Aw8sub) ∧ vs = [Loc_exh lnum; Litv_exh (IntLit i)]) ∨
     (∃n. op = (Op_i2 Aw8length) ∧ vs = [Loc_exh n]) ∨
@@ -279,6 +281,8 @@ val do_app_pat_correct = prove(
  >- (tac >>
      metis_tac [EL_MAP, v_to_pat_def, optionTheory.NOT_SOME_NONE, 
                 optionTheory.OPTION_MAP_DEF])
+ >- tac
+ >- tac
  >- (tac >>
      metis_tac [EL_MAP, sv_to_pat_def, store_v_distinct, store_v_11])
  >- (tac >>
@@ -352,6 +356,8 @@ val do_app_pat_cases = store_thm("do_app_pat_cases",
     (∃n. op = Op_pat (Op_i2 Opderef) ∧ vs = [Loc_pat n]) ∨
     (∃v. op = Op_pat (Op_i2 Opref) ∧ vs = [v]) ∨
     (∃idx v. op = Op_pat (Init_global_var_i2 idx) ∧ vs = [v]) ∨
+    (∃i. op = (Op_pat (Op_i2 W8fromInt)) ∧ vs = [Litv_pat (IntLit i)]) ∨
+    (∃w. op = (Op_pat (Op_i2 W8toInt)) ∧ vs = [Litv_pat (Word8 w)]) ∨
     (∃n w. op = Op_pat (Op_i2 Aw8alloc) ∧ vs = [Litv_pat (IntLit n); Litv_pat (Word8 w)]) ∨
     (∃lnum i. op = Op_pat (Op_i2 Aw8sub) ∧ vs = [Loc_pat lnum; Litv_pat (IntLit i)]) ∨
     (∃n. op = Op_pat (Op_i2 Aw8length) ∧ vs = [Loc_pat n]) ∨

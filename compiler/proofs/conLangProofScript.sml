@@ -992,6 +992,8 @@ val do_app_i2_correct = Q.prove (
  >- tac
  >- tac
  >- tac
+ >- tac
+ >- tac
  >- (tac >>
      pop_assum mp_tac >>
      rw [])
