@@ -433,15 +433,17 @@ val lookup_tenvC_st_ex_success = Q.prove (
  fs [st_ex_return_def]);
 
 val op_case_expand = Q.prove (
-`!f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 op st v st'.
+`!f1 f2 f3 f4 f5 f6 f7 g1 g2 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 op st v st'.
   ((case op of
        Opn opn => f1
      | Opb opb => f2
      | Equality => f3
      | Opapp => f4
-     | Opassign => f5 
+     | Opassign => f5
      | Opref => f6
      | Opderef => f7
+     | W8fromInt => g1
+     | W8toInt => g2
      | Aw8length => f8
      | Aw8alloc => f9
      | Aw8sub => f10
@@ -449,7 +451,7 @@ val op_case_expand = Q.prove (
      | VfromList => f12
      | Vsub => f13
      | Vlength => f14
-     | Alength => f15 
+     | Alength => f15
      | Aalloc => f16
      | Asub => f17
      | Aupdate => f18) st
@@ -462,6 +464,8 @@ val op_case_expand = Q.prove (
    ((op = Opassign) ∧ (f5 st = (Success v, st'))) ∨
    ((op = Opref) ∧ (f6 st = (Success v, st'))) ∨
    ((op = Opderef) ∧ (f7 st = (Success v, st'))) ∨
+   ((op = W8fromInt) ∧ (g1 st = (Success v, st'))) ∨
+   ((op = W8toInt) ∧ (g2 st = (Success v, st'))) ∨
    ((op = Aw8length) ∧ (f8 st = (Success v, st'))) ∨
    ((op = Aw8alloc) ∧ (f9 st = (Success v, st'))) ∨
    ((op = Aw8sub) ∧ (f10 st = (Success v, st'))) ∨
