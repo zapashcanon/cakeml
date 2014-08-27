@@ -52,7 +52,7 @@ val BOOL_def = Define `
   BOOL b = \v:v. (v = Litv (Bool b))`;
 
 val WORD8_def = Define `
-  WORD8 (w:word8) = NUM (w2n w)`;
+  WORD8 (w:word8) = \v:v. (v = Litv (Word8 w))`;
 
 val CONTAINER_def = Define `CONTAINER x = x`;
 
@@ -196,8 +196,8 @@ val Eval_Val_BOOL = store_thm("Eval_Val_BOOL",
   SIMP_TAC (srw_ss()) [Once evaluate_cases,BOOL_def,Eval_def]);
 
 val Eval_Val_WORD8 = store_thm("Eval_Val_WORD8",
-  ``!n. n < 256 ==> Eval env (Lit (IntLit (& n))) (WORD8 (n2w n))``,
-  SIMP_TAC (srw_ss()) [WORD8_def,wordsTheory.w2n_n2w,Eval_Val_NUM]);
+  ``!n. Eval env (Lit (Word8 n)) (WORD8 n)``,
+  SIMP_TAC (srw_ss()) [Once evaluate_cases,WORD8_def,Eval_def]);
 
 val Eval_Or = store_thm("Eval_Or",
   ``Eval env x1 (BOOL b1) ==>
@@ -616,11 +616,23 @@ val Eval_NUM_EQ_0 = store_thm("Eval_NUM_EQ_0",
   \\ `(n = 0) = (&n <= 0)` by intLib.COOPER_TAC
   \\ FULL_SIMP_TAC std_ss [Eval_INT_LESS_EQ]);
 
-(* word8 arithmetic *)
+(* word8 conversions *)
 
 val Eval_w2n = store_thm("Eval_w2n",
-  ``Eval env x1 (WORD8 w) ==> Eval env x1 (NUM (w2n w))``,
-  SIMP_TAC std_ss [WORD8_def]);
+  ``Eval env x1 (WORD8 w) ==> Eval env (App W8toInt [x1]) (NUM (w2n w))``,
+  SIMP_TAC std_ss [Eval_def,WORD8_def] \\ STRIP_TAC \\
+  SIMP_TAC (srw_ss()) [Once evaluate_cases] \\
+  SIMP_TAC (srw_ss()) [Once (CONJUNCT2 evaluate_cases)] \\
+  SIMP_TAC (srw_ss()) [Once (CONJUNCT2 evaluate_cases),PULL_EXISTS] \\
+  ASM_SIMP_TAC (srw_ss()) [do_app_cases,PULL_EXISTS,NUM_def,INT_def]);
+
+val Eval_i2w = store_thm("Eval_i2w",
+  ``Eval env x1 (INT i) ==> Eval env (App W8fromInt [x1]) (WORD8 (i2w i))``,
+  SIMP_TAC std_ss [Eval_def,WORD8_def,INT_def] \\ STRIP_TAC \\
+  SIMP_TAC (srw_ss()) [Once evaluate_cases] \\
+  SIMP_TAC (srw_ss()) [Once (CONJUNCT2 evaluate_cases)] \\
+  SIMP_TAC (srw_ss()) [Once (CONJUNCT2 evaluate_cases),PULL_EXISTS] \\
+  ASM_SIMP_TAC (srw_ss()) [do_app_cases,PULL_EXISTS] \\ METIS_TAC[]);
 
 (* Equality *)
 

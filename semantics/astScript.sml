@@ -81,6 +81,9 @@ val _ = Hol_datatype `
   | Opassign
   | Opref
   | Opderef
+  (* Word8 operations *)
+  | W8fromInt
+  | W8toInt
   (* Word8Array operations *)
   | Aw8alloc
   | Aw8sub

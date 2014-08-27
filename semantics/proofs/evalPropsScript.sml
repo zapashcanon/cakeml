@@ -59,6 +59,10 @@ val do_app_cases = Q.store_thm ("do_app_cases",
     (st = st') ∧
     (op = Opderef) ∧ (vs = [Loc lnum]) ∧ (store_lookup lnum st = SOME (Refv v2)) ∧
     (v = Rval v2)) ∨
+  (?i. (op = W8fromInt) ∧ (vs = [Litv (IntLit i)]) ∧
+       (st = st') ∧ (v = Rval (Litv (Word8 (i2w i))))) ∨
+  (?w. (op = W8toInt) ∧ (vs = [Litv (Word8 w)]) ∧
+       (st = st') ∧ (v = Rval (Litv (IntLit (&(w2n w)))))) ∨
   (?i w.
       (op = Aw8alloc) ∧ (vs = [Litv (IntLit i); Litv (Word8 w)]) ∧
       (((i < 0) ∧ v = Rerr (Rraise (prim_exn "Subscript")) ∧ (st = st')) ∨
