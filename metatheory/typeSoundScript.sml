@@ -1253,6 +1253,10 @@ val exp_type_preservation = Q.prove (
              rw [] >>
              fs [store_lookup_def] >>
              metis_tac [])
+         >- (rw[Once type_v_cases_eqn] >>
+             metis_tac [])
+         >- (rw[Once type_v_cases_eqn] >>
+             metis_tac [])
          >- (disj2_tac >>
              rw [Once type_v_cases_eqn] >>
              fs [store_alloc_def, store_lookup_def] >>

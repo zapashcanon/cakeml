@@ -991,8 +991,10 @@ val type_op_cases = Q.store_thm ("type_op_cases",
    ((op = Opapp) ∧ ?t2. ts = [Tfn t2 t3;t2]) ∨
    ((op = Equality) ∧ ?t1. ts = [t1; t1] ∧ (t3 = Tbool)) ∨
    ((op = Opassign) ∧ ?t2. ts = [Tref t2; t2] ∧ (t3 = Tunit)) ∨
-   ((op = Opref) ∧ ?t1. ts = [t1] ∧ t3 = Tref t1) ∨ 
+   ((op = Opref) ∧ ?t1. ts = [t1] ∧ t3 = Tref t1) ∨
    ((op = Opderef) ∧ ts = [Tref t3]) ∨
+   ((op = W8fromInt) ∧ ts = [Tint] ∧ t3 = Tword8) ∨
+   ((op = W8toInt) ∧ ts = [Tword8] ∧ t3 = Tint) ∨
    ((op = Aw8alloc) ∧ ts = [Tint; Tword8] ∧ t3 = Tword8array) ∨
    ((op = Aw8sub) ∧ ts = [Tword8array; Tint] ∧ t3 = Tword8) ∨
    ((op = Aw8length) ∧ ts = [Tword8array] ∧ t3 = Tint) ∨
