@@ -91,6 +91,9 @@ val orda_def = Define `
 (orda env (Abs (Var x1 ty1) t1) (Abs (Var x2 ty2) t2) =
           let c = typeorder ty1 ty2 in
           if c <> Equal then c else orda ((Var x1 ty1,Var x2 ty2)::env) t1 t2) ∧
+(orda env (Abs tm1 tm1') (Abs tm2 tm2') = 
+  (* HOL Light omits this case, which can't happen in WELLTYPED terms *)
+  termorder (Abs tm1 tm1') (Abs tm2 tm2')) ∧
 (orda env (Const _ _) _ = Less) ∧
 (orda env _ (Const _ _) = Greater) ∧
 (orda env (Var _ _) _ = Less) ∧

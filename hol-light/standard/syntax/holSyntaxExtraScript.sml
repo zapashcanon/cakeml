@@ -1,6 +1,10 @@
 open HolKernel boolLib boolSimps bossLib lcsymtacs pairTheory listTheory finite_mapTheory alistTheory relationTheory pred_setTheory sortingTheory stringTheory
 open miscLib miscTheory holSyntaxLibTheory holSyntaxTheory
+open balanced_mapTheory;
+
 val _ = temp_tight_equality()
+val every_case_tac = BasicProvers.EVERY_CASE_TAC;
+
 val _ = new_theory"holSyntaxExtra"
 
 val type_ind = save_thm("type_ind",
@@ -11,6 +15,45 @@ val type_ind = save_thm("type_ind",
   |> CONJUNCT1
   |> DISCH_ALL
   |> Q.GEN`P`)
+
+(* term ordering and comparison *)
+
+val typeorder_good = Q.store_thm ("typeorder_good",
+`good_cmp typeorder`,
+ simp [good_cmp_def] >>
+ rpt conj_tac >>
+ ho_match_mp_tac type_ind >>
+ rpt conj_tac >>
+ rpt gen_tac >>
+ TRY DISCH_TAC >>
+ TRY (Cases_on `y`) >>
+ TRY (Cases_on `z`) >>
+ fs [typeorder_def] >>
+ rw [] >>
+ cheat);
+ (*metis_tac [good_cmp_def, ssring_cmp_good, pair_cmp_good, list_cmp_good]*)
+
+val termorder_good = Q.store_thm ("termorder_good",
+`good_cmp termorder`,
+ cheat);
+
+val typeorder_antisym = Q.store_thm ("typeorder_antisym",
+`!x y. typeorder x y = Equal ⇔ x = y`,
+ ho_match_mp_tac typeorder_ind >>
+ rw [typeorder_def] >>
+ metis_tac [string_cmp_antisym]);
+
+val termorder_antisym = Q.store_thm ("termorder_antisym",
+`!x y. termorder x y = Equal ⇔ x = y`,
+ ho_match_mp_tac termorder_ind >>
+ rw [termorder_def] >>
+ rw [pair_cmp_def] >>
+ every_case_tac >>
+ metis_tac [string_cmp_antisym, typeorder_antisym, comparison_distinct]);
+
+val alphaorder_good = Q.store_thm ("alphaorder_good",
+`good_cmp alphaorder`,
+ cheat);
 
 (* deconstructing variables *)
 
@@ -185,6 +228,49 @@ val ACONV_TYPE = store_thm("ACONV_TYPE",
   ``∀s t. ACONV s t ⇒ welltyped s ∧ welltyped t ⇒ (typeof s = typeof t)``,
   rw[ACONV_def] >> imp_res_tac RACONV_TYPE >> fs[])
 
+val ALPHAVARS_ordav = Q.prove (
+`!env tm1 tm2. 
+  EVERY (\(t1,t2). ?x1 x2 ty. t1 = Var x1 ty ∧ t2 = Var x2 ty) env
+  ⇒
+  (ALPHAVARS env (tm1,tm2) 
+   ⇔ 
+   ordav env tm1 tm2 = Equal)`,
+ Induct_on `env` >>
+ rw [ALPHAVARS_def, ordav_def] >>
+ rw [ALPHAVARS_def, ordav_def] >>
+ fs [termorder_antisym] >>
+ PairCases_on `h` >>
+ fs [ordav_def] >>
+ every_case_tac >>
+ rw [] >>
+ fs [termorder_antisym]);
+
+val orda_RACONV = Q.prove (
+`!env tm1 tm2. 
+  welltyped tm1 ∧ welltyped tm2 ∧
+  EVERY (\(t1,t2). ?x1 x2 ty. t1 = Var x1 ty ∧ t2 = Var x2 ty) env
+  ⇒
+  (orda env tm1 tm2 = Equal ⇔ RACONV env (tm1, tm2))`,
+ ho_match_mp_tac orda_ind >>
+ rw [RACONV, orda_def, termorder_antisym]
+ >- metis_tac [ALPHAVARS_ordav]
+ >- (every_case_tac >>
+     rw [] >>
+     metis_tac [])
+ >- (every_case_tac >>
+     metis_tac [typeorder_antisym]));
+
+val alphaorder_ACONV = Q.store_thm ("alphaorder_ACONV",
+`!tm1 tm2.
+  welltyped tm1 ∧
+  welltyped tm2
+  ⇒
+  (alphaorder tm1 tm2 = Equal ⇔ ACONV tm1 tm2)`,
+ rw [alphaorder_def, ACONV_def] >>
+ match_mp_tac orda_RACONV >>
+ rw []);
+
+
 (* VFREE_IN lemmas *)
 
 val VFREE_IN_RACONV = store_thm("VFREE_IN_RACONV",
@@ -201,6 +287,7 @@ val VFREE_IN_ACONV = store_thm("VFREE_IN_ACONV",
   ``∀s t x ty. ACONV s t ⇒ (VFREE_IN (Var x ty) s ⇔ VFREE_IN (Var x ty) t)``,
   rw[ACONV_def] >> imp_res_tac VFREE_IN_RACONV >> fs[])
 
+  (* TERM_UNION is gone now 
 (* TERM_UNION lemmas *)
 
 val TERM_UNION_NONEW = store_thm("TERM_UNION_NONEW",
@@ -215,6 +302,7 @@ val TERM_UNION_THM = store_thm("TERM_UNION_THM",
 val EVERY_TERM_UNION = store_thm("EVERY_TERM_UNION",
   ``EVERY P l1 ∧ EVERY P l2 ⇒ EVERY P (TERM_UNION l1 l2)``,
   rw[EVERY_MEM] >> metis_tac[TERM_UNION_NONEW])
+  *)
 
 (* VSUBST lemmas *)
 
@@ -1518,7 +1606,9 @@ val theory_ok_sig = store_thm("theory_ok_sig",
 
 val proves_term_ok = store_thm("proves_term_ok",
   ``∀thyh c. thyh |- c ⇒
-      EVERY (λp. term_ok (sigof (FST thyh)) p ∧ p has_type Bool) (c::(SND thyh))``,
+      EVERY (λ(p,_). term_ok (sigof (FST thyh)) p ∧ p has_type Bool) ((c,())::(toAscList (SND thyh)))``,
+  cheat (*Proof need repair *));
+  (*
   ho_match_mp_tac proves_strongind >>
   strip_tac >- (
     rw[EQUATION_HAS_TYPE_BOOL] >>
@@ -1576,6 +1666,7 @@ val proves_term_ok = store_thm("proves_term_ok",
     simp[] >>
     match_mp_tac EVERY_TERM_UNION >> fs[] ) >>
   rw[theory_ok_def])
+  *)
 
 (* extension is transitive *)
 
@@ -1630,6 +1721,7 @@ val updates_theory_ok = store_thm("updates_theory_ok",
     rw[conexts_of_upd_def] >>
     imp_res_tac proves_term_ok >>
     fs[theory_ok_def,EVERY_MAP] >>
+    cheat (*
     rfs[term_ok_equation,UNCURRY,EQUATION_HAS_TYPE_BOOL] >>
     Q.PAT_ABBREV_TAC`tms' = X ⊌ tmsof ctxt` >>
     `tmsof ctxt ⊑ tms'` by (
@@ -1655,7 +1747,7 @@ val updates_theory_ok = store_thm("updates_theory_ok",
       fs[EVERY_MEM,term_ok_def,FORALL_PROD] >>
       metis_tac[is_instance_refl] ) >>
     match_mp_tac VSUBST_HAS_TYPE >>
-    simp[Abbr`ilist`,MEM_MAP,PULL_EXISTS,UNCURRY,Once has_type_cases] ) >>
+    simp[Abbr`ilist`,MEM_MAP,PULL_EXISTS,UNCURRY,Once has_type_cases]*) ) >>
   strip_tac >- (
     rw[conexts_of_upd_def] >>
     fs[theory_ok_def] >>
@@ -1770,6 +1862,7 @@ val ConstDef_updates = store_thm("ConstDef_updates",
   match_mp_tac(List.nth(CONJUNCTS updates_rules,2)) >>
   simp[EVERY_MAP] >> fs[SUBSET_DEF] >>
   simp[vfree_in_equation] >> fs[CLOSED_def] >>
+  cheat >>
   match_mp_tac(List.nth(CONJUNCTS proves_rules,1)) >>
   imp_res_tac term_ok_welltyped >>
   imp_res_tac theory_ok_sig >>
