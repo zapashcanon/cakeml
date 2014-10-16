@@ -224,7 +224,7 @@ val pair_cmp_good = Q.store_thm ("pair_cmp_good",
  every_case_tac >>
  metis_tac [pair_cmp_def, comparison_distinct, comparison_case_def, comparison_nchotomy]);
 
-val num_cmp_good = Q.prove (
+val num_cmp_good = Q.store_thm ("num_cmp_good",
 `good_cmp num_cmp`,
  simp [good_cmp_def] >>
  rpt conj_tac >>
@@ -235,7 +235,7 @@ val num_cmp_good = Q.prove (
  every_case_tac >>
  fs []);
 
-val char_cmp_good = Q.prove (
+val char_cmp_good = Q.store_thm ("char_cmp_good",
 `good_cmp char_cmp`,
  simp [good_cmp_def] >>
  rpt conj_tac >>
@@ -246,7 +246,7 @@ val char_cmp_good = Q.prove (
  every_case_tac >>
  fs []);
 
-val string_cmp_good = Q.prove (
+val string_cmp_good = Q.store_thm ("string_cmp_good",
 `good_cmp string_cmp`,
  metis_tac [string_cmp_def, char_cmp_good, list_cmp_good]);
 
@@ -313,6 +313,63 @@ val good_cmp_trans = Q.store_thm ("good_cmp_trans",
  fs [] >>
  metis_tac [cmp_thms]);
 
+val num_cmp_antisym = Q.store_thm ("num_cmp_antisym",
+`!x y. num_cmp x y = Equal ⇔ x = y`,
+ rw [num_cmp_def]);
+
+val char_cmp_antisym = Q.store_thm ("char_cmp_antisym",
+`!x y. char_cmp x y = Equal ⇔ x = y`,
+ rw [char_cmp_def, num_cmp_antisym] >>
+ rw [ORD_11]);
+
+val list_cmp_antisym = Q.store_thm ("list_cmp_antisym",
+`!cmp x y. (!x y. cmp x y = Equal ⇔ x = y) ⇒ (list_cmp cmp x y = Equal ⇔ x = y)`,
+ ho_match_mp_tac list_cmp_ind >>
+ rw [list_cmp_def] >>
+ every_case_tac >>
+ rw [] >>
+ metis_tac [comparison_distinct]);
+
+val string_cmp_antisym = Q.store_thm ("string_cmp_antisym",
+`!x y. string_cmp x y = Equal ⇔ x = y`,
+ metis_tac [string_cmp_def, char_cmp_antisym, list_cmp_antisym]);
+
+val pair_cmp_antisym = Q.store_thm ("pair_cmp_antisym",
+`!cmp1 cmp2 x y. 
+  (!x y. cmp1 x y = Equal ⇔ x = y) ∧
+  (!x y. cmp2 x y = Equal ⇔ x = y) 
+  ⇒ 
+  (pair_cmp cmp1 cmp2 x y = Equal ⇔ x = y)`,
+ Cases_on `x` >>
+ Cases_on `y` >>
+ rw [pair_cmp_def] >>
+ every_case_tac >>
+ rw [] >>
+ metis_tac [comparison_distinct]);
+
+val option_cmp_antisym = Q.store_thm ("option_cmp_antisym",
+`!cmp x y. 
+  (!x y. cmp x y = Equal ⇔ x = y) 
+  ⇒ 
+  (option_cmp cmp x y = Equal ⇔ x = y)`,
+ Cases_on `x` >>
+ Cases_on `y` >>
+ rw [option_cmp_def] >>
+ every_case_tac >>
+ rw [] >>
+ metis_tac [comparison_distinct]);
+
+val option_cmp2_antisym = Q.store_thm ("option_cmp2_antisym",
+`!cmp x y. 
+  (!x y. cmp x y = Equal ⇔ x = y) 
+  ⇒ 
+  (option_cmp2 cmp x y = Equal ⇔ x = y)`,
+ Cases_on `x` >>
+ Cases_on `y` >>
+ rw [option_cmp2_def] >>
+ every_case_tac >>
+ rw [] >>
+ metis_tac [comparison_distinct]);
 
 (* ------------------------ Finite maps up to key equivalence ------------------------ *)
 
