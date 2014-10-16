@@ -1,12 +1,16 @@
 open HolKernel boolLib boolSimps bossLib lcsymtacs pred_setTheory listTheory alistTheory holSyntaxLibTheory
+open balanced_mapTheory;
+
 val _ = temp_tight_equality()
+
 val _ = new_theory "holSyntax"
 
 (* HOL types *)
 
-val _ = Hol_datatype`type
-  = Tyvar of string
-  | Tyapp of string => type list`
+val _ = Datatype`
+type = 
+    Tyvar string
+  | Tyapp string (type list)`
 
 val _ = Parse.overload_on("Fun",``λs t. Tyapp "fun" [s;t]``)
 val _ = Parse.overload_on("Bool",``Tyapp "bool" []``)
@@ -24,11 +28,78 @@ fun type_rec_tac proj =
 
 (* HOL terms *)
 
-val _ = Hol_datatype`term
-  = Var of string => type
-  | Const of string => type
-  | Comb of term => term
-  | Abs of term => term`
+val _ = Datatype `
+term
+  = Var string type
+  | Const string type
+  | Comb term term
+  | Abs term term`
+
+(* Term ordering *)
+
+val typeorder_def = tDefine "typeorder" `
+(typeorder (Tyvar x1) (Tyvar x2) = string_cmp x1 x2) ∧
+(typeorder (Tyvar _) (Tyapp _ _) = Less) ∧
+(typeorder (Tyapp _ _) (Tyvar _) = Greater) ∧
+(typeorder (Tyapp x1 ts1) (Tyapp x2 ts2) = 
+  pair_cmp string_cmp (list_cmp typeorder) (x1,ts1) (x2,ts2))`
+(* Unprovable termination conditions are being generated. I don't know why,
+ * but it appears to do with the pair_cmp_cong theorem *)
+ cheat;
+
+val termorder_def = tDefine "termorder" `
+(termorder (Var x1 ty1) (Var x2 ty2) =
+  pair_cmp string_cmp typeorder (x1,ty1) (x2,ty2)) ∧ 
+(termorder (Var _ _) (Const _ _) = Less) ∧
+(termorder (Var _ _) (Comb _ _) = Less) ∧
+(termorder (Var _ _) (Abs _ _) = Less) ∧
+(termorder (Const _ _) (Var _ _) = Greater) ∧
+(termorder (Const x1 ty1) (Const x2 ty2) =
+  pair_cmp string_cmp typeorder (x1,ty1) (x2,ty2)) ∧ 
+(termorder (Const _ _) (Comb _ _) = Less) ∧
+(termorder (Const _ _) (Abs _ _) = Less) ∧
+(termorder (Comb _ _) (Var _ _) = Greater) ∧
+(termorder (Comb _ _) (Const _ _) = Greater) ∧
+(termorder (Comb tm1 tm1') (Comb tm2 tm2') =
+  pair_cmp termorder termorder (tm1,tm1') (tm2,tm2')) ∧
+(termorder (Comb _ _) (Abs _ _) = Less) ∧
+(termorder (Abs x1 ty1) (Var x2 ty2) = Greater) ∧
+(termorder (Abs _ _) (Const _ _) = Greater) ∧
+(termorder (Abs _ _) (Comb _ _) = Greater) ∧
+(termorder (Abs tm1 tm1') (Abs tm2 tm2') = 
+  pair_cmp termorder termorder (tm1,tm1') (tm2,tm2'))`
+(* Unprovable termination conditions are being generated. I don't know why,
+ * but it appears to do with the pair_cmp_cong theorem *)
+ cheat;
+
+(* Term ordering up to alpha equivalence *)
+
+val ordav_def = Define `
+(ordav [] x1 x2 = termorder x1 x2) ∧
+(ordav ((t1,t2)::oenv) x1 x2 = 
+   if termorder x1 t1 = Equal
+   then if termorder x2 t2 = Equal
+        then Equal else Less 
+   else if termorder x2 t2 = Equal then Greater
+   else ordav oenv x1 x2)`;
+
+val orda_def = Define `
+(orda env (Var x1 ty1) (Var x2 ty2) = ordav env (Var x1 ty1) (Var x2 ty2)) ∧
+(orda env (Const x1 ty1) (Const x2 ty2) = termorder (Const x1 ty1) (Const x2 ty2)) ∧
+(orda env (Comb s1 t1) (Comb s2 t2) =
+          let c = orda env s1 s2 in if c <> Equal then c else orda env t1 t2) ∧
+(orda env (Abs (Var x1 ty1) t1) (Abs (Var x2 ty2) t2) =
+          let c = typeorder ty1 ty2 in
+          if c <> Equal then c else orda ((Var x1 ty1,Var x2 ty2)::env) t1 t2) ∧
+(orda env (Const _ _) _ = Less) ∧
+(orda env _ (Const _ _) = Greater) ∧
+(orda env (Var _ _) _ = Less) ∧
+(orda env _ (Var _ _) = Greater) ∧
+(orda env (Comb _ _) _ = Less) ∧
+(orda env _ (Comb _ _) = Greater)`;
+
+val alphaorder_def = Define `
+alphaorder = orda []`;
 
 val _ = Parse.overload_on("Equal",``λty. Const "=" (Fun ty (Fun ty Bool))``)
 
@@ -77,15 +148,6 @@ val (RACONV_rules,RACONV_ind,RACONV_cases) = Hol_reln`
 
 val ACONV_def = Define`
   ACONV t1 t2 ⇔ RACONV [] (t1,t2)`
-
-(* Alpha-respecting union of two lists of terms.
-   Retain duplicates in the second list. *)
-
-val TERM_UNION_def = Define`
-  TERM_UNION [] l2 = l2 ∧
-  TERM_UNION (h::t) l2 =
-    let subun = TERM_UNION t l2 in
-    if EXISTS (ACONV h) subun then subun else h::subun`
 
 (* Whether a variables (or constant) occurs free in a term. *)
 
@@ -327,60 +389,61 @@ val _ = Parse.add_infix("|-",450,Parse.NONASSOC)
 
 val (proves_rules,proves_ind,proves_cases) = xHol_reln"proves"`
   (* ABS *)
-  (¬(EXISTS (VFREE_IN (Var x ty)) h) ∧ type_ok (tysof thy) ty ∧
+  (¬(EXISTS (VFREE_IN (Var x ty)) (MAP FST (toAscList h))) ∧ type_ok (tysof thy) ty ∧
    (thy, h) |- l === r
    ⇒ (thy, h) |- (Abs (Var x ty) l) === (Abs (Var x ty) r)) ∧
 
   (* ASSUME *)
   (theory_ok thy ∧ p has_type Bool ∧ term_ok (sigof thy) p
-   ⇒ (thy, [p]) |- p) ∧
+   ⇒ (thy, singleton p ()) |- p) ∧
 
   (* BETA *)
   (theory_ok thy ∧ type_ok (tysof thy) ty ∧ term_ok (sigof thy) t
-   ⇒ (thy, []) |- Comb (Abs (Var x ty) t) (Var x ty) === t) ∧
+   ⇒ (thy, empty) |- Comb (Abs (Var x ty) t) (Var x ty) === t) ∧
 
   (* DEDUCT_ANTISYM *)
   ((thy, h1) |- c1 ∧
    (thy, h2) |- c2
-   ⇒ (thy, TERM_UNION (FILTER((~) o ACONV c2) h1)
-                      (FILTER((~) o ACONV c1) h2))
+   ⇒ (thy, union alphaorder (delete alphaorder c2 h1) (delete alphaorder c1 h2))
            |- c1 === c2) ∧
 
   (* EQ_MP *)
   ((thy, h1) |- p === q ∧
    (thy, h2) |- p' ∧ ACONV p p'
-   ⇒ (thy, TERM_UNION h1 h2) |- q) ∧
+   ⇒ (thy, union alphaorder h1 h2) |- q) ∧
 
+   (*
   (* INST *)
   ((∀s s'. MEM (s',s) ilist ⇒
              ∃x ty. (s = Var x ty) ∧ s' has_type ty ∧ term_ok (sigof thy) s') ∧
    (thy, h) |- c
-   ⇒ (thy, MAP (VSUBST ilist) h) |- VSUBST ilist c) ∧
+   ⇒ (thy, fromList alphaorder (MAP (VSUBST ilist) (toAscList h))) |- VSUBST ilist c) ∧
 
   (* INST_TYPE *)
   ((EVERY (type_ok (tysof thy)) (MAP FST tyin)) ∧
    (thy, h) |- c
-   ⇒ (thy, MAP (INST tyin) h) |- INST tyin c) ∧
+   ⇒ (thy, fromList alphaorder (MAP (INST tyin) (toAscList h))) |- INST tyin c) ∧
+   *)
 
   (* MK_COMB *)
   ((thy, h1) |- l1 === r1 ∧
    (thy, h2) |- l2 === r2 ∧
    welltyped(Comb l1 l2)
-   ⇒ (thy, TERM_UNION h1 h2) |- Comb l1 l2 === Comb r1 r2) ∧
+   ⇒ (thy, union alphaorder h1 h2) |- Comb l1 l2 === Comb r1 r2) ∧
 
   (* REFL *)
   (theory_ok thy ∧ term_ok (sigof thy) t
-   ⇒ (thy, []) |- t === t) ∧
+   ⇒ (thy, empty) |- t === t) ∧
 
   (* TRANS *)
   ((thy, h1) |- l === m1 ∧
    (thy, h2) |- m2 === r ∧
    ACONV m1 m2
-   ⇒ (thy, TERM_UNION h1 h2) |- l === r) ∧
+   ⇒ (thy, union alphaorder h1 h2) |- l === r) ∧
 
   (* axioms *)
   (theory_ok thy ∧ c ∈ (axsof thy)
-   ⇒ (thy, []) |- c)`
+   ⇒ (thy, empty) |- c)`
 
 (* A context is a sequence of updates *)
 
@@ -476,7 +539,7 @@ val (updates_rules,updates_ind,updates_cases) = Hol_reln`
    ⇒ (NewConst name ty) updates ctxt) ∧
 
   (* new_specification *)
-  ((thyof ctxt, MAP (λ(s,t). Var s (typeof t) === t) eqs) |- prop ∧
+  ((thyof ctxt, fromList alphaorder (MAP (λ(s,t). (Var s (typeof t) === t, ())) eqs)) |- prop ∧
    EVERY
      (λt. CLOSED t ∧
           (∀v. MEM v (tvars t) ⇒ MEM v (tyvars (typeof t))))
@@ -492,7 +555,7 @@ val (updates_rules,updates_ind,updates_cases) = Hol_reln`
    ⇒ (NewType name arity) updates ctxt) ∧
 
   (* new_type_definition *)
-  ((thyof ctxt, []) |- Comb pred witness ∧
+  ((thyof ctxt, empty) |- Comb pred witness ∧
    CLOSED pred ∧
    name ∉ (FDOM (tysof ctxt)) ∧
    abs ∉ (FDOM (tmsof ctxt)) ∧
