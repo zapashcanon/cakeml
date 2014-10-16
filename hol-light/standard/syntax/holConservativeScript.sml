@@ -70,7 +70,7 @@ val update_extension = Q.prove (
          >- (Cases_on `ctxt` >>
              fs [])))
  >- (rw [Once proves_cases] >>
-     disj2_tac >>
+     ntac 2 disj2_tac >>
      disj1_tac >>
      rw [] >>
      MAP_EVERY qexists_tac [`t`, `ty`, `x`] >>
@@ -138,7 +138,7 @@ val update_extension = Q.prove (
      rw [] >>
      metis_tac [])
  >- (rw [Once proves_cases] >>
-     ntac 7 disj2_tac >>
+     ntac 8 disj2_tac >>
      disj1_tac >>
      rw [] >>
      qexists_tac `t` >>
@@ -160,7 +160,7 @@ val update_extension = Q.prove (
      rw [] >>
      metis_tac [])
  >- (rw [Once proves_cases] >>
-     ntac 9 disj2_tac >>
+     ntac 10 disj2_tac >>
      rw []
      >- (imp_res_tac updates_theory_ok >>
          fs [])
@@ -207,6 +207,7 @@ val updates_to_subst = Q.prove (
      PairCases_on `e` >>
      fs [] >>
      rfs [term_ok_equation] >>
+     cheat >>
      metis_tac [term_ok_welltyped])
  >- (fs [is_std_sig_def] >>
      CCONTR_TAC >>
@@ -350,7 +351,8 @@ val term_ok_remove_upd = Q.prove (
              PairCases_on `y` >>
              fs [] >>
              res_tac >>
-             fs [])
+             fs [] >>
+             cheat)
          >- (PairCases_on `e` >>
              fs [some_def] >>
              rw [] >>
@@ -385,21 +387,6 @@ val theory_ok_remove_upd = Q.prove (
  imp_res_tac proves_theory_ok >>
  fs []);
 
-(* Not true as stated, since removing constants can make terms become equal. *)
-val remove_const_term_union = Q.prove (
-`!tms1 tms2.
-  MAP (remove_const thy consts) (TERM_UNION tms1 tms2)
-  =
-  TERM_UNION (MAP (remove_const thy consts) tms1) (MAP (remove_const thy consts) tms2)`,
- Induct_on `tms1` >>
- rw [TERM_UNION_def] >>
- every_case_tac >>
- rw [] >>
- unabbrev_all_tac >>
- fs [EVERY_MEM, EXISTS_MEM] >>
- imp_res_tac TERM_UNION_NONEW >>
- cheat);
-
 val remove_const_inst = Q.prove (
 `!tys consts tyin tm.
   remove_const tys consts (INST tyin tm) = INST tyin (remove_const tys consts tm)`,
@@ -426,9 +413,9 @@ val welltyped_remove_const = Q.prove (
 
 val use_const_spec = Q.prove (
 `!ctxt consts p.
-  (thyof ctxt,MAP (λ(s,t). Var s (typeof t) === t) consts) |- p
+  (thyof ctxt,fromList alphaorder (MAP (λ(s,t). (Var s (typeof t) === t, ())) consts)) |- p
   ⇒
-  (thyof ctxt,[]) |-
+  (thyof ctxt,empty) |-
   remove_const (tysof ctxt) consts (VSUBST (MAP (λ(s,t). (Const s (typeof t),Var s (typeof t))) consts) p)`,
  cheat);
 
@@ -449,6 +436,7 @@ val remove_const_old_axiom = Q.prove (
  imp_res_tac ALOOKUP_MEM >>
  metis_tac []);
 
+ (*
 val update_conservative = Q.prove (
 `!lhs tm.
   lhs |- tm
@@ -458,7 +446,7 @@ val update_conservative = Q.prove (
     upd updates ctxt ∧
     (?consts p. upd = ConstSpec consts p)
     ⇒
-    (thyof ctxt,MAP (remove_const (tysof (upd::ctxt)) (upd_to_subst upd)) tms) |- remove_const (tysof (upd::ctxt)) (upd_to_subst upd) tm`,
+    (thyof ctxt,map_keys alphaorder (remove_const (tysof (upd::ctxt)) (upd_to_subst upd)) tms) |- remove_const (tysof (upd::ctxt)) (upd_to_subst upd) tm`,
  ho_match_mp_tac proves_ind >>
  rw [] >>
  imp_res_tac updates_to_subst >>
@@ -473,6 +461,7 @@ val update_conservative = Q.prove (
          fs [MEM_MAP] >>
          rw [] >>
          res_tac >>
+         cheat >>
          metis_tac [vfree_in_remove_const])
      >- (match_mp_tac type_ok_extend >>
          qexists_tac `tysof (sigof (thyof ctxt))` >>
@@ -487,16 +476,18 @@ val update_conservative = Q.prove (
      disj1_tac >>
      rw [] >>
      fs []
+     >- cheat
      >- metis_tac [theory_ok_remove_upd]
      >- metis_tac [has_type_remove_const]
      >- (match_mp_tac term_ok_remove_upd >>
          fs []))
  >- (rw [Once proves_cases] >>
-     disj2_tac >>
+     ntac 2 disj2_tac >>
      disj1_tac >>
      MAP_EVERY qexists_tac [`remove_const (tysof ctxt) consts t`, `ty`, `x`] >>
      rw [remove_const_eq, remove_const_def] >>
      fs []
+     >- cheat
      >- rw [upd_to_subst_def]
      >- metis_tac [theory_ok_remove_upd]
      >- (match_mp_tac (SIMP_RULE (srw_ss()) [PULL_EXISTS, upd_to_subst_def] term_ok_remove_upd) >>
@@ -505,9 +496,11 @@ val update_conservative = Q.prove (
      ntac 3 disj2_tac >>
      disj1_tac >>
      MAP_EVERY qexists_tac [`remove_const (tysof ctxt) consts tm`, `remove_const (tysof ctxt) consts tm'`, 
-                            `MAP (remove_const (tysof ctxt) consts) h1`, `MAP (remove_const (tysof ctxt) consts) h2`] >>
+                            `map_keys alphaorder (remove_const (tysof ctxt) consts) h1`, 
+                            `map_keys alphaorder (remove_const (tysof ctxt) consts) h2`] >>
      rw [remove_const_eq, remove_const_def] >>
-     fs [upd_to_subst_def, remove_const_term_union, rich_listTheory.FILTER_MAP]
+     fs [upd_to_subst_def, rich_listTheory.FILTER_MAP]
+     >> cheat
      >- cheat (* TODO: not true as stated, need an extra weakening step? *)
      >- (LAST_X_ASSUM (qspecl_then [`ctxt`, `ConstSpec consts p`] mp_tac) >>
          rw [upd_to_subst_def])
@@ -516,10 +509,10 @@ val update_conservative = Q.prove (
  >- (rw [Once proves_cases] >>
      ntac 4 disj2_tac >>
      disj1_tac >>
-     rw [remove_const_term_union] >>
+     rw [] >>
      fs [upd_to_subst_def] >>
-     MAP_EVERY qexists_tac [`MAP (remove_const (tysof ctxt) consts) h1`,
-                            `MAP (remove_const (tysof ctxt) consts) h2`,
+     MAP_EVERY qexists_tac [`map_keys alphaorder (remove_const (tysof ctxt) consts) h1`,
+                            `map_keys alphaorder (remove_const (tysof ctxt) consts) h2`,
                             `remove_const (tysof ctxt) consts p`,
                             `remove_const (tysof ctxt) consts tm`] >>
      rw [] >>
@@ -608,5 +601,6 @@ val update_conservative = Q.prove (
          fs [theory_ok_def] >>
          res_tac >>
          metis_tac [remove_const_old_axiom])));
+         *)
 
 val _ = export_theory ();

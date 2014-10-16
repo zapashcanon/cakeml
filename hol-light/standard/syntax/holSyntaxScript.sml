@@ -415,18 +415,16 @@ val (proves_rules,proves_ind,proves_cases) = xHol_reln"proves"`
    (thy, h2) |- p' ∧ ACONV p p'
    ⇒ (thy, union alphaorder h1 h2) |- q) ∧
 
-   (*
   (* INST *)
   ((∀s s'. MEM (s',s) ilist ⇒
              ∃x ty. (s = Var x ty) ∧ s' has_type ty ∧ term_ok (sigof thy) s') ∧
    (thy, h) |- c
-   ⇒ (thy, fromList alphaorder (MAP (VSUBST ilist) (toAscList h))) |- VSUBST ilist c) ∧
+   ⇒ (thy, map_keys alphaorder (VSUBST ilist) h) |- VSUBST ilist c) ∧
 
   (* INST_TYPE *)
   ((EVERY (type_ok (tysof thy)) (MAP FST tyin)) ∧
    (thy, h) |- c
-   ⇒ (thy, fromList alphaorder (MAP (INST tyin) (toAscList h))) |- INST tyin c) ∧
-   *)
+   ⇒ (thy, map_keys alphaorder (INST tyin) h) |- INST tyin c) ∧
 
   (* MK_COMB *)
   ((thy, h1) |- l1 === r1 ∧

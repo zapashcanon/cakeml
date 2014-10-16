@@ -2884,4 +2884,33 @@ val fromList_thm = Q.store_thm ("fromList_thm",
  simp [] >>
  fs [fromList_def]);
 
+(* ------------------------ Extra stuff, not from ghc ----------------- *)
+val map_keys_def = Define `
+map_keys cmp f t = fromList cmp (MAP (\(k,v). (f k, v)) (toAscList t))`;
+
+(*
+val map_keys_thm = Q.store_thm ("map_keys_thm",
+`!cmp1 cmp2 f t.
+  good_cmp cmp1 ∧
+  good_cmp cmp2 ∧
+  invariant cmp1 t ∧
+  (!k1 k2. cmp1 k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal)
+  ⇒
+  invariant cmp2 (map_keys cmp2 f t) ∧
+  to_fmap cmp2 (map_keys cmp2 f t) = MAP_KEYS (IMAGE f) (to_fmap cmp1 t)`,
+
+ simp [map_keys_def] >>
+ rpt gen_tac >>
+ DISCH_TAC >>
+ inv_mp_tac fromList_thm >>
+ rw [MAP_MAP_o, combinTheory.o_DEF] >>
+ rw [LAMBDA_PROD] >>
+ rw [fmap_eq_flookup] >>
+
+
+ fs [combinTheory.o_DEF]
+
+ imp_res_tac toAscList_thm >>
+ *)
+
 val _ = export_theory ();
