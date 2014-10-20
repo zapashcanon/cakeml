@@ -165,6 +165,12 @@ pair_cmp cmp1 cmp2 x y =
      | Less => Less
      | Greater => Greater`;
 
+val bool_cmp_def = Define `
+(bool_cmp T T = Equal) ∧
+(bool_cmp F F = Equal) ∧
+(bool_cmp T F = Greater) ∧
+(bool_cmp F T = Less)`;
+
 val num_cmp_def = Define `
 num_cmp n1 n2 =
   if n1 = n2 then

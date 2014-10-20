@@ -11,11 +11,16 @@ val _ = temp_tight_equality ();
 (* oset for ordered set *)
 val _ = type_abbrev ("oset", ``:('a,unit) balanced_map``);
 val _ = overload_on ("good_oset", ``(\cmp s. good_cmp cmp ∧ invariant cmp s):('a -> 'a -> comparison) -> 'a oset -> bool``);
+val _ = overload_on ("oempty", ``empty:'a oset``);
 val _ = overload_on ("oin", ``(\cmp v s. lookup cmp v s ≠ NONE):('a -> 'a -> comparison) -> 'a -> 'a oset -> bool``);
 val _ = overload_on ("oinsert", ``(\cmp v s. insert cmp v () s):('a -> 'a -> comparison) -> 'a -> 'a oset -> 'a oset``);
 val _ = overload_on ("odelete", ``(\cmp s v. delete cmp v s):('a -> 'a -> comparison) -> 'a oset -> 'a -> 'a oset``);
 val _ = overload_on ("ounion", ``(\cmp s1 s2. union cmp s1 s2):('a -> 'a -> comparison) -> 'a oset -> 'a oset -> 'a oset``);
 val _ = overload_on ("oimage", ``(\cmp f s. map_keys cmp f s):('b -> 'b -> comparison) -> ('a -> 'b) -> 'a oset -> 'b oset``);
+
+val good_oset_oempty = Q.store_thm ("good_oset_oempty",
+`!cmp. good_cmp cmp ⇒ good_oset cmp oempty`,
+ rw [empty_thm]);
 
 val good_oset_oinsert = Q.store_thm ("good_oset_oinsert",
 `!cmp s x. good_oset cmp s ⇒ good_oset cmp (oinsert cmp x s)`,
@@ -35,6 +40,10 @@ val good_oset_ounion = Q.store_thm ("good_oset_ounion",
 val good_oset_oimage = Q.store_thm ("good_oset_oimage",
 `!cmp f s. good_cmp cmp ⇒ good_oset cmp (oimage cmp f s)`,
  cheat);
+
+val oin_oempty = Q.store_thm ("oin_oinsert",
+`!cmp x. oin cmp x oempty = F`,
+ rw [empty_def, lookup_def]); 
 
 val oin_oinsert = Q.store_thm ("oin_oinsert",
 `∀cmp x y s. good_oset cmp s ⇒ (oin cmp x (oinsert cmp y s) ⇔ cmp x y = Equal ∨ oin cmp x s)`,
