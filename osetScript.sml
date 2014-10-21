@@ -121,7 +121,7 @@ val oextension = Q.store_thm ("oextension",
 `!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (ocompare cmp s1 s2 = Equal ⇔ (!x. oin cmp x s1 ⇔ oin cmp x s2))`,
  cheat);
 
-val oevery_oin = Q.store_thm ("oforall_oin",
+val oevery_oin = Q.store_thm ("oevery_oin",
 `!cmp f s. 
   good_oset cmp s ∧
   (∀k1 k2. cmp k1 k2 = Equal ⇒ (f k1 ⇔ f k2))
@@ -132,7 +132,7 @@ val oevery_oin = Q.store_thm ("oforall_oin",
  imp_res_tac every_thm >>
  rw [lookup_thm, flookup_thm, member_thm]);
 
-val oexists_oin = Q.store_thm ("oforall_oin",
+val oexists_oin = Q.store_thm ("oexists_oin",
 `!cmp f s. 
   good_oset cmp s ∧
   (∀k1 k2. cmp k1 k2 = Equal ⇒ (f k1 ⇔ f k2))

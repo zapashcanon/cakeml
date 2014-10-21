@@ -1604,9 +1604,12 @@ val theory_ok_sig = store_thm("theory_ok_sig",
   ``∀thy. theory_ok thy ⇒ is_std_sig (sigof thy)``,
   Cases >> rw[theory_ok_def])
 
+(* The oevery abbreviation seems to kill the printer in the next theorem *)
+val oevery_tmp_def = Define `oevery_tmp = oevery`;
+
 val proves_term_ok = store_thm("proves_term_ok",
   ``∀thyh c. thyh |- c ⇒
-      oforall (λp. term_ok (sigof (FST thyh)) p ∧ p has_type Bool) (oinsert alphaorder c (SND thyh))``,
+      oevery_tmp (λp. term_ok (sigof (FST thyh)) p ∧ p has_type Bool) (oinsert alphaorder c (SND thyh))``,
   cheat (*Proof need repair *));
   (*
   ho_match_mp_tac proves_strongind >>
@@ -1614,7 +1617,9 @@ val proves_term_ok = store_thm("proves_term_ok",
     rw[EQUATION_HAS_TYPE_BOOL] >>
     imp_res_tac proves_theory_ok >>
     imp_res_tac theory_ok_sig >>
-    fs[term_ok_equation,term_ok_def]) >>
+    fs[term_ok_equation,term_ok_def] >>
+    fs [oevery_tmp_def] >>
+    rw [oevery_oin]) >>
   strip_tac >- rw[EQUATION_HAS_TYPE_BOOL] >>
   strip_tac >- (
     rw[EQUATION_HAS_TYPE_BOOL] >>
