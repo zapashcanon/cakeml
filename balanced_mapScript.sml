@@ -617,7 +617,7 @@ val invariant_def = Define `
   invariant cmp l ∧
   invariant cmp r)`;
 
-val invariant_eq = Q.prove (
+val invariant_eq = Q.store_thm ("invariant_eq",
 `(invariant cmp Tip ⇔ T) ∧
  (invariant cmp (Bin s k v l r) ⇔
   (good_cmp cmp ⇒ DISJOINT (FDOM (to_fmap cmp l)) (FDOM (to_fmap cmp r))) ∧
@@ -2632,6 +2632,8 @@ val fromList_thm = Q.store_thm ("fromList_thm",
 val map_keys_def = Define `
 map_keys cmp f t = fromList cmp (MAP (\(k,v). (f k, v)) (toAscList t))`;
 
+
+
 (*
 val map_keys_thm = Q.store_thm ("map_keys_thm",
 `!cmp1 cmp2 f t.
@@ -2656,5 +2658,105 @@ val map_keys_thm = Q.store_thm ("map_keys_thm",
 
  imp_res_tac toAscList_thm >>
  *)
+
+val every_def = Define `
+(every f Tip = T) ∧
+(every f (Bin _ kx x l r) = 
+  if f kx x then
+    if every f l then
+      if every f r then T else F
+    else F
+  else F)`;
+
+val every_thm = Q.store_thm ("every_thm",
+`!f t cmp. 
+  good_cmp cmp ∧
+  invariant cmp t ∧
+  (!k1 v k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v)
+  ⇒ 
+  (every f t ⇔ (!k v. lookup cmp k t = SOME v ⇒ f k v))`,
+ Induct_on `t` >>
+ rw [every_def, lookup_def] >>
+ fs [invariant_eq] >>
+ first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
+ first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
+ rfs [] >>
+ eq_tac >>
+ rw []
+ >- (EVERY_CASE_TAC >>
+     fs [] >>
+     metis_tac [])
+ >- (first_x_assum (qspecl_then [`k`] assume_tac) >>
+     rfs [] >>
+     EVERY_CASE_TAC >>
+     fs [] >>
+     metis_tac [cmp_thms])
+ >- (first_x_assum (qspecl_then [`k'`] assume_tac) >>
+     EVERY_CASE_TAC >>
+     fs [] >>
+     rfs [lookup_thm, flookup_thm] >>
+     rfs [key_ordered_to_fmap] >>
+     res_tac >>
+     imp_res_tac key_set_cmp_thm >>
+     metis_tac [cmp_thms])
+ >- (first_x_assum (qspecl_then [`k'`] assume_tac) >>
+     EVERY_CASE_TAC >>
+     fs [] >>
+     rfs [lookup_thm, flookup_thm] >>
+     rfs [key_ordered_to_fmap] >>
+     res_tac >>
+     imp_res_tac key_set_cmp_thm >>
+     metis_tac [cmp_thms]));
+
+val exists_def = Define `
+(exists f Tip = F) ∧
+(exists f (Bin _ kx x l r) = 
+  if f kx x then
+    T
+  else if exists f l then
+    T
+  else if exists f r then
+    T
+  else
+    F)`;
+
+val exists_thm = Q.store_thm ("exists_thm",
+`!f t cmp. 
+  good_cmp cmp ∧
+  invariant cmp t ∧
+  (!k1 v k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v)
+  ⇒ 
+  (exists f t ⇔ (?k v. lookup cmp k t = SOME v ∧ f k v))`,
+ Induct_on `t` >>
+ rw [exists_def, lookup_def] >>
+ fs [invariant_eq] >>
+ first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
+ first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
+ rfs [] >>
+ eq_tac >>
+ rw []
+ >- metis_tac [cmp_thms]
+ >- (qexists_tac `k'` >>
+     rw [] >>
+     EVERY_CASE_TAC >>
+     fs [] >>
+     rfs [lookup_thm, flookup_thm] >>
+     rfs [key_ordered_to_fmap] >>
+     res_tac >>
+     imp_res_tac key_set_cmp_thm >>
+     metis_tac [cmp_thms])
+ >- (qexists_tac `k'` >>
+     rw [] >>
+     EVERY_CASE_TAC >>
+     fs [] >>
+     rfs [lookup_thm, flookup_thm] >>
+     rfs [key_ordered_to_fmap] >>
+     res_tac >>
+     imp_res_tac key_set_cmp_thm >>
+     metis_tac [cmp_thms])
+ >- (EVERY_CASE_TAC >>
+     fs [] >>
+     metis_tac []));
+ 
 
 val _ = export_theory ();

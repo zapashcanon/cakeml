@@ -22,14 +22,8 @@ val _ = overload_on ("ounion", ``(\cmp s1 s2. union cmp s1 s2):('a -> 'a -> comp
 val _ = overload_on ("oimage", ``(\cmp f s. map_keys cmp f s):('b -> 'b -> comparison) -> ('a -> 'b) -> 'a oset -> 'b oset``);
 val _ = overload_on ("osubset", ``(\cmp s1 s2. isSubmapOf cmp s1 s2):('a -> 'a -> comparison) -> 'a oset -> 'a oset -> bool``);
 val _ = overload_on ("ocompare", ``(\cmp s1 s2. compare (\(x,y) (x',y'). cmp x x') s1 s2):('a -> 'a -> comparison) -> 'a oset -> 'a oset -> comparison``);
-
-(* Definitions of derived concepts *)
-
-val oforall_def = Define `
-oforall f s ⇔ oin bool_cmp F (oimage bool_cmp f s) = F`;
-
-val oexists_def = Define `
-oexists f s ⇔ oin bool_cmp T (oimage bool_cmp f s) = T`;
+val _ = overload_on ("oevery", ``(\f s. every (\x y. f x) s):('a -> bool) -> 'a oset -> bool``);
+val _ = overload_on ("oexists", ``(\f s. exists (\x y. f x) s):('a -> bool) -> 'a oset -> bool``);
 
 (* operations preserve good_set *)
 
@@ -126,5 +120,27 @@ val osubset_thm = Q.store_thm ("osubset_thm",
 val oextension = Q.store_thm ("oextension",
 `!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (ocompare cmp s1 s2 = Equal ⇔ (!x. oin cmp x s1 ⇔ oin cmp x s2))`,
  cheat);
+
+val oevery_oin = Q.store_thm ("oforall_oin",
+`!cmp f s. 
+  good_oset cmp s ∧
+  (∀k1 k2. cmp k1 k2 = Equal ⇒ (f k1 ⇔ f k2))
+  ⇒ 
+  (oevery f s ⇔ (!x. oin cmp x s ⇒ f x))`,
+ rw [] >>
+ `∀k1 (v:unit) k2 (v:unit). cmp k1 k2 = Equal ⇒ ((\x y. f x) k1 v ⇔ (\x y. f x) k2 v)` by metis_tac [] >>
+ imp_res_tac every_thm >>
+ rw [lookup_thm, flookup_thm, member_thm]);
+
+val oexists_oin = Q.store_thm ("oforall_oin",
+`!cmp f s. 
+  good_oset cmp s ∧
+  (∀k1 k2. cmp k1 k2 = Equal ⇒ (f k1 ⇔ f k2))
+  ⇒ 
+  (oexists f s ⇔ (?x. oin cmp x s ∧ f x))`,
+ rw [] >>
+ `∀k1 (v:unit) k2 (v:unit). cmp k1 k2 = Equal ⇒ ((\x y. f x) k1 v ⇔ (\x y. f x) k2 v)` by metis_tac [] >>
+ imp_res_tac exists_thm >>
+ rw [lookup_thm, flookup_thm, member_thm]);
 
 val _ = export_theory ();
