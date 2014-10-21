@@ -267,6 +267,8 @@ val _ = Define `
     | (Aw8sub, [Tapp [] TC_word8array; Tapp [] TC_int]) => (t = Tapp [] TC_word8)
     | (Aw8length, [Tapp [] TC_word8array]) => (t = Tapp [] TC_int)
     | (Aw8update, [Tapp [] TC_word8array; Tapp [] TC_int; Tapp [] TC_word8]) => t = Tapp [] TC_unit
+    | (Explode, [Tapp [] TC_string]) => t = Tapp [Tapp [] TC_char] (TC_name (Short "list"))
+    | (Implode, [Tapp [Tapp [] TC_char] (TC_name (Short "list"))]) => t = Tapp [] TC_string
     | (VfromList, [Tapp [t1] (TC_name (Short "list"))]) => t = Tapp [t1] TC_vector
     | (Vsub, [Tapp [t1] TC_vector; Tapp [] TC_int]) => t = t1
     | (Vlength, [Tapp [t1] TC_vector]) => (t = Tapp [] TC_int)
@@ -400,6 +402,11 @@ T
 ==>
 type_p tvs cenv (Plit (IntLit n)) Tint [])
 
+/\ (! tvs cenv c.
+T
+==>
+type_p tvs cenv (Plit (Char c)) Tchar [])
+
 /\ (! tvs cenv s.
 T
 ==>
@@ -453,6 +460,11 @@ type_e menv cenv tenv (Lit (Bool b)) Tbool)
 T
 ==>
 type_e menv cenv tenv (Lit (IntLit n)) Tint)
+
+/\ (! menv cenv tenv c.
+T
+==>
+type_e menv cenv tenv (Lit (Char c)) Tchar)
 
 /\ (! menv cenv tenv s.
 T

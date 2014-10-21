@@ -965,6 +965,8 @@ val type_op_cases = Q.store_thm ("type_op_cases",
    ((op = Aw8sub) ∧ ts = [Tword8array; Tint] ∧ t3 = Tword8) ∨
    ((op = Aw8length) ∧ ts = [Tword8array] ∧ t3 = Tint) ∨
    ((op = Aw8update) ∧ ts = [Tword8array; Tint; Tword8] ∧ t3 = Tunit) ∨
+   ((op = Explode) ∧ ts = [Tstring] ∧ t3 = Tapp [Tchar] (TC_name (Short "list"))) ∨
+   ((op = Implode) ∧ ts = [Tapp [Tchar] (TC_name (Short "list"))] ∧ t3 = Tstring) ∨
    ((op = VfromList) ∧ ?t2. ts = [Tapp [t2] (TC_name (Short "list"))] ∧ t3 = Tapp [t2] TC_vector) ∨
    ((op = Vsub) ∧ ts = [Tapp [t3] TC_vector; Tint]) ∨
    ((op = Vlength) ∧ ?t1. ts = [Tapp [t1] TC_vector] ∧ t3 = Tint) ∨
@@ -974,7 +976,7 @@ val type_op_cases = Q.store_thm ("type_op_cases",
    ((op = Aupdate) ∧ ?t1. ts = [Tapp [t1] TC_array; Tint; t1] ∧ t3 = Tunit))`,
  rw [type_op_def] >>
  every_case_tac >>
- fs [] >>
+ fs [Tchar_def] >>
  metis_tac []);
 
 (* ---------- type_p ---------- *)
@@ -998,7 +1000,7 @@ val type_p_freevars = Q.store_thm ("type_p_freevars",
    EVERY (check_freevars tvs []) (MAP SND env'))`,
 ho_match_mp_tac type_p_ind >>
 rw [check_freevars_def, bind_tenv_def,
-    tenv_ok_def, bind_tvar_def, bind_var_list_def] >>
+    tenv_ok_def, bind_tvar_def, bind_var_list_def, Tchar_def] >>
 metis_tac []);
 
 val type_p_subst = Q.store_thm ("type_p_subst",
@@ -1027,7 +1029,7 @@ val type_p_subst = Q.store_thm ("type_p_subst",
 ho_match_mp_tac type_p_strongind >>
 rw [] >>
 ONCE_REWRITE_TAC [type_p_cases] >>
-rw [deBruijn_subst_def, OPTION_MAP_DEF] >|
+rw [deBruijn_subst_def, OPTION_MAP_DEF, Tchar_def] >|
 [metis_tac [check_freevars_lem],
  rw [EVERY_MAP] >>
      fs [EVERY_MEM] >>
@@ -1112,7 +1114,7 @@ val type_e_freevars = Q.store_thm ("type_e_freevars",
  ho_match_mp_tac type_e_strongind >>
  rw [check_freevars_def, bind_tenv_def, num_tvs_def, type_op_cases,
      tenv_ok_def, bind_tvar_def, bind_var_list_def, opt_bind_tenv_def] >>
- fs [check_freevars_def]
+ fs [check_freevars_def,Tchar_def]
  >- metis_tac [deBruijn_subst_check_freevars]
  >- metis_tac [type_e_freevars_lem4, arithmeticTheory.ADD]
  >- metis_tac [type_e_freevars_lem4, arithmeticTheory.ADD]
@@ -1182,7 +1184,7 @@ val type_e_subst = Q.store_thm ("type_e_subst",
      num_tvs_db_merge, num_tvs_deBruijn_subst_tenvE] >>
  fs [deBruijn_subst_def, deBruijn_subst_tenvE_def, opt_bind_tenv_def, 
      bind_tvar_rewrites, bind_tenv_def, num_tvs_def, OPTION_MAP_DEF,
-     num_tvs_db_merge, num_tvs_deBruijn_subst_tenvE, tenv_ok_def] >>
+     num_tvs_db_merge, num_tvs_deBruijn_subst_tenvE, tenv_ok_def, Tchar_def] >>
  `tenv_ok tenvE2` by metis_tac [tenv_ok_db_merge, bind_tvar_def, tenv_ok_def]
  >- metis_tac [check_freevars_lem]
  >- (fs [RES_FORALL] >>
@@ -1267,7 +1269,7 @@ val type_e_subst = Q.store_thm ("type_e_subst",
      metis_tac [type_e_subst_lem3])
  >- (fs [type_op_cases] >>
      rw [] >>
-     fs [deBruijn_subst_def] >>
+     fs [deBruijn_subst_def,Tchar_def] >>
      metis_tac [])
  >- (fs [RES_FORALL] >>
      qexists_tac `deBruijn_subst (num_tvs tenvE1) (MAP (deBruijn_inc 0 (num_tvs tenvE1)) targs) t` >>
@@ -1825,7 +1827,7 @@ val type_v_freevars = Q.store_thm ("type_v_freevars",
  (!tenvS tenvC envM tenvM. consistent_mod_env tenvS tenvC envM tenvM ⇒
    T)`,
  ho_match_mp_tac type_v_strongind >>
- rw [check_freevars_def, tenv_ok_def, bind_tenv_def, num_tvs_def, bind_tvar_def] >-
+ rw [check_freevars_def, tenv_ok_def, bind_tenv_def, num_tvs_def, bind_tvar_def, Tchar_def] >-
  metis_tac [] >>
  res_tac
  >- metis_tac [num_tvs_def, type_e_freevars, bind_tenv_def, bind_tvar_def,
@@ -1979,7 +1981,7 @@ val type_subst = Q.store_thm ("type_subst",
  pop_assum (ASSUME_TAC o SIMP_RULE (srw_ss()) [Once type_v_cases]) >>
  rw [deBruijn_inc_def, deBruijn_subst_def] >>
  rw [deBruijn_inc_def, deBruijn_subst_def] >>
- fs [check_freevars_def] >>
+ fs [check_freevars_def, Tchar_def] >>
  rw [deBruijn_inc_def, deBruijn_subst_def] >>
  rw [nil_deBruijn_inc, deBruijn_subst_check_freevars, type_subst_lem3,
      nil_deBruijn_subst]
@@ -2904,6 +2906,7 @@ val type_e_closed = prove(
       type_funs tmenv tcenv tenv funs ts ⇒
       FV_defs funs ⊆ (IMAGE Short (tenv_names tenv)) ∪ tmenv_dom tmenv)``,
   ho_match_mp_tac type_e_strongind >>
+  strip_tac >- simp[] >>
   strip_tac >- simp[] >>
   strip_tac >- simp[] >>
   strip_tac >- simp[] >>

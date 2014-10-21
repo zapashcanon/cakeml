@@ -227,6 +227,8 @@ val do_app_exh_cases = Q.store_thm("do_app_exh_cases",
     (∃lnum i. op = (Op_i2 Aw8sub) ∧ vs = [Loc_exh lnum; Litv_exh (IntLit i)]) ∨
     (∃n. op = (Op_i2 Aw8length) ∧ vs = [Loc_exh n]) ∨
     (∃lnum i w. op = (Op_i2 Aw8update) ∧ vs = [Loc_exh lnum; Litv_exh (IntLit i); Litv_exh (Word8 w)]) ∨
+    (∃v s. op = (Op_i2 Explode) ∧ vs = [Litv_exh (StrLit s)]) ∨
+    (∃v ls. op = (Op_i2 Implode) ∧ vs = [v] ∧ (v_exh_to_char_list v = SOME ls)) ∨
     (∃v vs'. op = (Op_i2 VfromList) ∧ vs = [v] ∧ (v_to_list_exh v = SOME vs')) ∨
     (∃vs' i. op = (Op_i2 Vsub) ∧ vs = [Vectorv_exh vs'; Litv_exh (IntLit i)]) ∨
     (∃vs'. op = (Op_i2 Vlength) ∧ vs = [Vectorv_exh vs']) ∨
@@ -236,8 +238,11 @@ val do_app_exh_cases = Q.store_thm("do_app_exh_cases",
     (∃lnum i v. op = (Op_i2 Aupdate) ∧ vs = [Loc_exh lnum; Litv_exh (IntLit i); v])`,
   PairCases_on `s` >>
   rw[do_app_exh_def] >>
-  BasicProvers.EVERY_CASE_TAC >>
-  fs[]);
+  pop_assum mp_tac >>
+  BasicProvers.CASE_TAC >- (
+    BasicProvers.EVERY_CASE_TAC >> fs[] ) >>
+  Cases_on`op`>> simp[] >>
+  BasicProvers.EVERY_CASE_TAC >> fs[]);
 
 val tac =
   rw [do_app_pat_def, prim_exn_exh_def, prim_exn_pat_def] >>
@@ -257,6 +262,21 @@ val tac =
   BasicProvers.EVERY_CASE_TAC >>
   fs [] >>
   rw [prim_exn_exh_def, v_to_pat_def];
+
+val char_list_to_v_pat_correct = prove(
+  ``∀ls. char_list_to_v_pat ls = v_to_pat (char_list_to_v_exh ls)``,
+  Induct >> simp[char_list_to_v_exh_def,char_list_to_v_pat_def])
+
+val v_pat_to_char_list_correct = Q.prove (
+`!v1 v2 vs1.
+  v_to_pat v1 = v2 ∧
+  v_exh_to_char_list v1 = SOME vs1
+  ⇒
+  v_pat_to_char_list v2 = SOME vs1`,
+ ho_match_mp_tac v_exh_to_char_list_ind >>
+ rw [v_exh_to_char_list_def] >>
+ BasicProvers.EVERY_CASE_TAC >>
+ fs [v_to_pat_def, v_pat_to_char_list_def]);
 
 val do_app_pat_correct = prove(
   ``∀op vs s0 s0_pat env s res.
@@ -287,6 +307,8 @@ val do_app_pat_correct = prove(
      metis_tac [EL_MAP, sv_to_pat_def, store_v_distinct, store_v_11])
  >- (tac >>
      metis_tac [EL_MAP, sv_to_pat_def, store_v_distinct, store_v_11])
+ >- (tac >> simp[char_list_to_v_pat_correct])
+ >- (imp_res_tac v_pat_to_char_list_correct >> tac)
  >- (rw [do_app_pat_def] >>
      BasicProvers.EVERY_CASE_TAC >>
      imp_res_tac v_to_list_pat_correct >>
@@ -356,6 +378,8 @@ val do_app_pat_cases = store_thm("do_app_pat_cases",
     (∃lnum i. op = Op_pat (Op_i2 Aw8sub) ∧ vs = [Loc_pat lnum; Litv_pat (IntLit i)]) ∨
     (∃n. op = Op_pat (Op_i2 Aw8length) ∧ vs = [Loc_pat n]) ∨
     (∃lnum i w. op = Op_pat (Op_i2 Aw8update) ∧ vs = [Loc_pat lnum; Litv_pat (IntLit i); Litv_pat (Word8 w)]) ∨
+    (∃v s. op = Op_pat (Op_i2 Explode) ∧ vs = [Litv_pat (StrLit s)]) ∨
+    (∃v ls. op = Op_pat (Op_i2 Implode) ∧ vs = [v] ∧ (v_pat_to_char_list v = SOME ls)) ∨
     (∃v vs'. op = Op_pat (Op_i2 VfromList) ∧ vs = [v] ∧ (v_to_list_pat v = SOME vs')) ∨
     (∃vs' i. op = Op_pat (Op_i2 Vsub) ∧ vs = [Vectorv_pat vs'; Litv_pat (IntLit i)]) ∨
     (∃vs'. op = Op_pat (Op_i2 Vlength) ∧ vs = [Vectorv_pat vs']) ∨
@@ -380,6 +404,10 @@ val v_to_list_no_closures = Q.prove (
  BasicProvers.EVERY_CASE_TAC >>
  fs [v_to_pat_def, v_to_list_pat_def] >>
  rw []);
+
+val char_list_to_v_pat_no_closures = prove(
+  ``∀ls. no_closures_pat (char_list_to_v_pat ls)``,
+  Induct >> simp[char_list_to_v_pat_def])
 
 val fo_pat_correct = store_thm("fo_pat_correct",
   ``(∀e. fo_pat e ⇒
@@ -413,7 +441,7 @@ val fo_pat_correct = store_thm("fo_pat_correct",
       fs[EVERY_MEM,MEM_EL,PULL_EXISTS] >>
       first_x_assum(match_mp_tac) >>
       simp[] >> NO_TAC) >>
-    metis_tac [v_to_list_no_closures]));
+    metis_tac [v_to_list_no_closures, char_list_to_v_pat_no_closures]));
 
 val do_eq_no_closures_pat = store_thm("do_eq_no_closures_pat",
   ``(∀v1 v2. no_closures_pat v1 ∧ no_closures_pat v2 ⇒ do_eq_pat v1 v2 ≠ Eq_closure) ∧
@@ -1356,6 +1384,21 @@ val v_to_list_pat_v_pat = prove(
   BasicProvers.CASE_TAC >> rw[] >>
   res_tac >> simp[])
 
+val v_pat_to_char_list_v_pat = prove(
+  ``∀l1 l2 n l3.
+    v_pat l1 l2 ∧ v_pat_to_char_list l1 = SOME l3 ⇒
+    v_pat_to_char_list l2 = SOME l3``,
+  ho_match_mp_tac v_pat_to_char_list_ind >>
+  simp[v_pat_to_char_list_def] >> rw[] >- (
+    fs[Once v_pat_cases]>>
+    simp[v_pat_to_char_list_def] ) >>
+  last_x_assum mp_tac >>
+  simp[Once v_pat_cases] >> rw[] >>
+  simp[v_pat_to_char_list_def] >>
+  last_x_assum mp_tac >>
+  BasicProvers.CASE_TAC >> rw[] >>
+  res_tac >> simp[])
+
 val do_app_pat_v_pat = store_thm("do_app_pat_v_pat",
   ``∀env s op env' s' vs vs'.
       LIST_REL v_pat vs vs' ⇒
@@ -1380,8 +1423,9 @@ val do_app_pat_v_pat = store_thm("do_app_pat_v_pat",
       fs[LIST_REL_EL_EQN,optionTheory.OPTREL_def] >>
       fs[Once v_pat_cases,store_lookup_def] >>
       rw[] >>
-      fs[v_to_list_pat_def] >>
+      fs[v_to_list_pat_def,v_pat_to_char_list_def,v_to_list_pat_def] >>
       imp_res_tac v_to_list_pat_v_pat >>
+      imp_res_tac v_pat_to_char_list_v_pat >>
       metis_tac[v_pat_cases,v_pat_sym,optionTheory.NOT_SOME_NONE,LIST_REL_LENGTH,sv_rel_def] ) >>
     rw[] >> fs[] >>
     Cases_on`xs`>>fs[] >- (
@@ -1459,6 +1503,7 @@ val do_app_pat_v_pat = store_thm("do_app_pat_v_pat",
   imp_res_tac LIST_REL_LENGTH >> rw[]>>fs[]>>rw[csg_rel_def,sv_rel_def] >>
   imp_res_tac do_eq_pat_v_pat >> fs[] >>
   imp_res_tac v_to_list_pat_v_pat >> simp[] >>
+  imp_res_tac v_pat_to_char_list_v_pat >> simp[] >>
   BasicProvers.EVERY_CASE_TAC>>fs[]>>rw[csg_rel_def]>>
   fs[LIST_REL_EL_EQN,EL_LUPDATE]>>rw[sv_rel_def] >>
   fs[rich_listTheory.LENGTH_REPLICATE,rich_listTheory.EL_REPLICATE] >>
