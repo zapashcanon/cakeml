@@ -1,5 +1,5 @@
 open HolKernel boolLib boolSimps bossLib lcsymtacs pred_setTheory listTheory alistTheory holSyntaxLibTheory
-open balanced_mapTheory;
+open osetTheory;
 
 val _ = temp_tight_equality()
 
@@ -392,59 +392,59 @@ val _ = Parse.add_infix("|-",450,Parse.NONASSOC)
 
 val (proves_rules,proves_ind,proves_cases) = xHol_reln"proves"`
   (* ABS *)
-  (¬(EXISTS (VFREE_IN (Var x ty)) (MAP FST (toAscList h))) ∧ type_ok (tysof thy) ty ∧
+  (¬(oexists (VFREE_IN (Var x ty)) h) ∧ type_ok (tysof thy) ty ∧
    (thy, h) |- l === r
    ⇒ (thy, h) |- (Abs (Var x ty) l) === (Abs (Var x ty) r)) ∧
 
   (* ASSUME *)
   (theory_ok thy ∧ p has_type Bool ∧ term_ok (sigof thy) p
-   ⇒ (thy, singleton p ()) |- p) ∧
+   ⇒ (thy, osingleton p) |- p) ∧
 
   (* BETA *)
   (theory_ok thy ∧ type_ok (tysof thy) ty ∧ term_ok (sigof thy) t
-   ⇒ (thy, empty) |- Comb (Abs (Var x ty) t) (Var x ty) === t) ∧
+   ⇒ (thy, oempty) |- Comb (Abs (Var x ty) t) (Var x ty) === t) ∧
 
   (* DEDUCT_ANTISYM *)
   ((thy, h1) |- c1 ∧
    (thy, h2) |- c2
-   ⇒ (thy, union alphaorder (delete alphaorder c2 h1) (delete alphaorder c1 h2))
+   ⇒ (thy, ounion alphaorder (odelete alphaorder h1 c2) (odelete alphaorder h2 c1))
            |- c1 === c2) ∧
 
   (* EQ_MP *)
   ((thy, h1) |- p === q ∧
    (thy, h2) |- p' ∧ ACONV p p'
-   ⇒ (thy, union alphaorder h1 h2) |- q) ∧
+   ⇒ (thy, ounion alphaorder h1 h2) |- q) ∧
 
   (* INST *)
   ((∀s s'. MEM (s',s) ilist ⇒
              ∃x ty. (s = Var x ty) ∧ s' has_type ty ∧ term_ok (sigof thy) s') ∧
    (thy, h) |- c
-   ⇒ (thy, map_keys alphaorder (VSUBST ilist) h) |- VSUBST ilist c) ∧
+   ⇒ (thy, oimage alphaorder (VSUBST ilist) h) |- VSUBST ilist c) ∧
 
   (* INST_TYPE *)
   ((EVERY (type_ok (tysof thy)) (MAP FST tyin)) ∧
    (thy, h) |- c
-   ⇒ (thy, map_keys alphaorder (INST tyin) h) |- INST tyin c) ∧
+   ⇒ (thy, oimage alphaorder (INST tyin) h) |- INST tyin c) ∧
 
   (* MK_COMB *)
   ((thy, h1) |- l1 === r1 ∧
    (thy, h2) |- l2 === r2 ∧
    welltyped(Comb l1 l2)
-   ⇒ (thy, union alphaorder h1 h2) |- Comb l1 l2 === Comb r1 r2) ∧
+   ⇒ (thy, ounion alphaorder h1 h2) |- Comb l1 l2 === Comb r1 r2) ∧
 
   (* REFL *)
   (theory_ok thy ∧ term_ok (sigof thy) t
-   ⇒ (thy, empty) |- t === t) ∧
+   ⇒ (thy, oempty) |- t === t) ∧
 
   (* TRANS *)
   ((thy, h1) |- l === m1 ∧
    (thy, h2) |- m2 === r ∧
    ACONV m1 m2
-   ⇒ (thy, union alphaorder h1 h2) |- l === r) ∧
+   ⇒ (thy, ounion alphaorder h1 h2) |- l === r) ∧
 
   (* axioms *)
   (theory_ok thy ∧ c ∈ (axsof thy)
-   ⇒ (thy, empty) |- c)`
+   ⇒ (thy, oempty) |- c)`
 
 (* A context is a sequence of updates *)
 

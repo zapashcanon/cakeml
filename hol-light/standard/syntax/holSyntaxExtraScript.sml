@@ -1,6 +1,6 @@
 open HolKernel boolLib boolSimps bossLib lcsymtacs pairTheory listTheory finite_mapTheory alistTheory relationTheory pred_setTheory sortingTheory stringTheory
 open miscLib miscTheory holSyntaxLibTheory holSyntaxTheory
-open balanced_mapTheory;
+open comparisonTheory osetTheory;
 
 val _ = temp_tight_equality()
 val every_case_tac = BasicProvers.EVERY_CASE_TAC;
@@ -1606,7 +1606,7 @@ val theory_ok_sig = store_thm("theory_ok_sig",
 
 val proves_term_ok = store_thm("proves_term_ok",
   ``∀thyh c. thyh |- c ⇒
-      EVERY (λ(p,_). term_ok (sigof (FST thyh)) p ∧ p has_type Bool) ((c,())::(toAscList (SND thyh)))``,
+      oforall (λp. term_ok (sigof (FST thyh)) p ∧ p has_type Bool) (oinsert alphaorder c (SND thyh))``,
   cheat (*Proof need repair *));
   (*
   ho_match_mp_tac proves_strongind >>
