@@ -2629,6 +2629,10 @@ val fromList_thm = Q.store_thm ("fromList_thm",
  fs [fromList_def]);
 
 (* ------------------------ Extra stuff, not from ghc ----------------- *)
+
+val resp_equiv_def = Define `
+resp_equiv cmp f ⇔ !k1 k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v`;
+
 val map_keys_def = Define `
 map_keys cmp f t = fromList cmp (MAP (\(k,v). (f k, v)) (toAscList t))`;
 
@@ -2672,12 +2676,12 @@ val every_thm = Q.store_thm ("every_thm",
 `!f t cmp. 
   good_cmp cmp ∧
   invariant cmp t ∧
-  (!k1 v k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v)
+  resp_equiv cmp f
   ⇒ 
   (every f t ⇔ (!k v. lookup cmp k t = SOME v ⇒ f k v))`,
  Induct_on `t` >>
  rw [every_def, lookup_def] >>
- fs [invariant_eq] >>
+ fs [invariant_eq, resp_equiv_def] >>
  first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
  first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
  rfs [] >>
@@ -2724,12 +2728,12 @@ val exists_thm = Q.store_thm ("exists_thm",
 `!f t cmp. 
   good_cmp cmp ∧
   invariant cmp t ∧
-  (!k1 v k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v)
+  resp_equiv cmp f
   ⇒ 
   (exists f t ⇔ (?k v. lookup cmp k t = SOME v ∧ f k v))`,
  Induct_on `t` >>
  rw [exists_def, lookup_def] >>
- fs [invariant_eq] >>
+ fs [invariant_eq, resp_equiv_def] >>
  first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
  first_x_assum (qspecl_then [`f`, `cmp`] assume_tac) >>
  rfs [] >>
@@ -2757,6 +2761,5 @@ val exists_thm = Q.store_thm ("exists_thm",
  >- (EVERY_CASE_TAC >>
      fs [] >>
      metis_tac []));
- 
 
 val _ = export_theory ();

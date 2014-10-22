@@ -48,13 +48,16 @@ oevery f (s:'a oset) ⇔  every (\x y. f x) s`;
 val oexists_def = Define `
 oexists f (s:'a oset) ⇔  exists (\x y. f x) s`;
 
+val oresp_equiv_def = Define `
+oresp_equiv cmp f = resp_equiv cmp (λx y:unit. f x)`;
+
 (* operations preserve good_set *)
 
 val good_oset_oempty = Q.store_thm ("good_oset_oempty",
 `!cmp. good_cmp cmp ⇒ good_oset cmp oempty`,
  rw [empty_thm, good_oset_def, oempty_def]);
 
-val good_oset_singleton = Q.store_thm ("good_oset_singleton",
+val good_oset_osingleton = Q.store_thm ("good_oset_osingleton",
 `!cmp x. good_cmp cmp ⇒ good_oset cmp (osingleton x)`,
  rw [singleton_thm, good_oset_def, osingleton_def]);
 
@@ -93,11 +96,11 @@ val good_cmp_ocompare = Q.store_thm ("good_cmp_ocompare",
 
 (* How oin interacts with other operations *)
 
-val oin_oempty = Q.store_thm ("oin_oinsert",
+val oin_oempty = Q.store_thm ("oin_oinsert[simp]",
 `!cmp x. oin cmp x oempty = F`,
  rw [oin_def, oempty_def, empty_def, member_def]); 
 
-val oin_singleton = Q.store_thm ("oin_singleton",
+val oin_singleton = Q.store_thm ("oin_singleton[simp]",
 `∀cmp x y. oin cmp x (osingleton y) ⇔ cmp x y = Equal`,
  rw [oin_def, osingleton_def, member_def, singleton_def] >>
  EVERY_CASE_TAC);
@@ -149,23 +152,100 @@ val oextension = Q.store_thm ("oextension",
 val oevery_oin = Q.store_thm ("oevery_oin",
 `!cmp f s. 
   good_oset cmp s ∧
-  (∀k1 k2. cmp k1 k2 = Equal ⇒ (f k1 ⇔ f k2))
+  oresp_equiv cmp f
   ⇒ 
   (oevery f s ⇔ (!x. oin cmp x s ⇒ f x))`,
- rw [good_oset_def, oevery_def, oin_def] >>
- `∀k1 (v:unit) k2 (v:unit). cmp k1 k2 = Equal ⇒ ((\x y. f x) k1 v ⇔ (\x y. f x) k2 v)` by metis_tac [] >>
+ rw [good_oset_def, oevery_def, oin_def, oresp_equiv_def] >>
  imp_res_tac every_thm >>
  rw [lookup_thm, flookup_thm, member_thm]);
 
 val oexists_oin = Q.store_thm ("oexists_oin",
 `!cmp f s. 
   good_oset cmp s ∧
-  (∀k1 k2. cmp k1 k2 = Equal ⇒ (f k1 ⇔ f k2))
+  oresp_equiv cmp f
   ⇒ 
   (oexists f s ⇔ (?x. oin cmp x s ∧ f x))`,
- rw [good_oset_def, oexists_def, oin_def] >>
- `∀k1 (v:unit) k2 (v:unit). cmp k1 k2 = Equal ⇒ ((\x y. f x) k1 v ⇔ (\x y. f x) k2 v)` by metis_tac [] >>
+ rw [oresp_equiv_def, good_oset_def, oexists_def, oin_def] >>
  imp_res_tac exists_thm >>
  rw [lookup_thm, flookup_thm, member_thm]);
+
+(* Theorems about oevery and oexists *)
+
+val oevery_oempty = Q.store_thm ("oevery_oempty[simp]",
+`!f. oevery f oempty = T`,
+ rw [oevery_def, oempty_def, every_def, empty_def]);
+
+val oexists_oempty = Q.store_thm ("oexists_oempty[simp]",
+`!f. oexists f oempty = F`,
+ rw [oexists_def, oempty_def, exists_def, empty_def]);
+
+val oevery_osingleton = Q.store_thm ("oevery_osingleton[simp]",
+`!f x. oevery f (osingleton x) = f x`,
+ rw [oevery_def, osingleton_def, every_def, singleton_def]);
+
+val oexists_osingleton = Q.store_thm ("oexists_osingleton[simp]",
+`!f x. oexists f (osingleton x) = f x`,
+ rw [oexists_def, osingleton_def, exists_def, singleton_def]);
+
+val oevery_oinsert = Q.store_thm ("oevery_oinsert",
+`!f cmp x s.
+  good_oset cmp s ∧
+  oresp_equiv cmp f
+  ⇒
+  (oevery f (oinsert cmp x s) ⇔ f x ∧ oevery f s)`,
+ rw [] >>
+ `good_oset cmp (oinsert cmp x s)` by metis_tac [good_oset_oinsert] >>
+ imp_res_tac oevery_oin >>
+ rw [oin_oinsert] >>
+ eq_tac >>
+ rw [] >>
+ fs [oresp_equiv_def, resp_equiv_def] >>
+ metis_tac [good_oset_def, cmp_thms]);
+
+val oexists_oinsert = Q.store_thm ("oexists_oinsert",
+`!f cmp x s.
+  good_oset cmp s ∧
+  oresp_equiv cmp f
+  ⇒
+  (oexists f (oinsert cmp x s) ⇔ f x ∨ oexists f s)`,
+ rw [] >>
+ `good_oset cmp (oinsert cmp x s)` by metis_tac [good_oset_oinsert] >>
+ imp_res_tac oexists_oin >>
+ rw [oin_oinsert] >>
+ eq_tac >>
+ rw [] >>
+ fs [oresp_equiv_def, resp_equiv_def] >>
+ metis_tac [good_oset_def, cmp_thms]);
+
+val oevery_ounion = Q.store_thm ("oevery_ounion",
+`!f cmp s1 s2.
+  good_oset cmp s1 ∧
+  good_oset cmp s2 ∧
+  oresp_equiv cmp f
+  ⇒
+  (oevery f (ounion cmp s1 s2) ⇔ oevery f s1 ∧ oevery f s2)`,
+ rw [] >>
+ `good_oset cmp (ounion cmp s1 s2)` by metis_tac [good_oset_ounion] >>
+ imp_res_tac oevery_oin >>
+ rw [oin_ounion] >>
+ eq_tac >>
+ rw [] >>
+ fs [oresp_equiv_def, resp_equiv_def]);
+
+val oexists_ounion = Q.store_thm ("oexists_ounion",
+`!f cmp s1 s2.
+  good_oset cmp s1 ∧
+  good_oset cmp s2 ∧
+  oresp_equiv cmp f
+  ⇒
+  (oexists f (ounion cmp s1 s2) ⇔ oexists f s1 ∨ oexists f s2)`,
+ rw [] >>
+ `good_oset cmp (ounion cmp s1 s2)` by metis_tac [good_oset_ounion] >>
+ imp_res_tac oexists_oin >>
+ rw [oin_ounion] >>
+ eq_tac >>
+ rw [] >>
+ fs [oresp_equiv_def, resp_equiv_def] >>
+ metis_tac []);
 
 val _ = export_theory ();
