@@ -270,6 +270,44 @@ val alphaorder_ACONV = Q.store_thm ("alphaorder_ACONV",
  match_mp_tac orda_RACONV >>
  rw []);
 
+val ordav_welltyped = Q.prove (
+`!env tm1 tm2.
+  EVERY (\(t1,t2). ?x1 x2 ty. t1 = Var x1 ty ∧ t2 = Var x2 ty) env ∧
+  welltyped tm1 ∧ 
+  ordav env tm1 tm2 = Equal 
+  ⇒ 
+  welltyped tm2 ∧ 
+  typeof tm1 = typeof tm2`,
+ ho_match_mp_tac ordav_ind >>
+ rw [ordav_def, termorder_antisym] >>
+ rw []);
+
+val orda_welltyped = Q.prove (
+`!env tm1 tm2. 
+  EVERY (\(t1,t2). ?x1 x2 ty. t1 = Var x1 ty ∧ t2 = Var x2 ty) env ∧
+  welltyped tm1 ∧ 
+  orda env tm1 tm2 = Equal 
+  ⇒ 
+  welltyped tm2 ∧ 
+  typeof tm1 = typeof tm2`,
+ ho_match_mp_tac orda_ind >>
+ rw [orda_def, LET_THM, termorder_antisym, typeorder_antisym]
+ >- (imp_res_tac ordav_welltyped >>
+     fs [welltyped_def])
+ >- metis_tac []
+ >- metis_tac []
+ >- metis_tac []
+ >- metis_tac []
+ >- metis_tac []
+ >- metis_tac [] >>
+ CCONTR_TAC >> 
+ fs [] >> 
+ rw []);
+
+val alphaorder_welltyped = Q.store_thm ("alphaorder_welltyped",
+`!tm1 tm2. welltyped tm1 ∧ alphaorder tm1 tm2 = Equal ⇒ welltyped tm2 ∧ typeof tm1 = typeof tm2`,
+ rw [alphaorder_def] >>
+ metis_tac [orda_welltyped, EVERY_DEF]);
 
 (* VFREE_IN lemmas *)
 
@@ -1604,37 +1642,68 @@ val theory_ok_sig = store_thm("theory_ok_sig",
   ``∀thy. theory_ok thy ⇒ is_std_sig (sigof thy)``,
   Cases >> rw[theory_ok_def])
 
-(* The oevery abbreviation seems to kill the printer in the next theorem *)
-val oevery_tmp_def = Define `oevery_tmp = oevery`;
+val oresp_equiv_lem = Q.prove (
+`!sig. oresp_equiv alphaorder (λp. term_ok sig p ∧ p has_type Bool)`,
+ rw [oresp_equiv_def, balanced_mapTheory.resp_equiv_def] >>
+ eq_tac >>
+ rw [] >>
+ `welltyped p ∧ welltyped p'` by
+          metis_tac [welltyped_def, good_cmp_def, alphaorder_good, alphaorder_welltyped] >>
+ fs [alphaorder_ACONV] >>
+ imp_res_tac ACONV_TYPE 
+ >- metis_tac [term_ok_aconv]
+ >- (fs [WELLTYPED] >>
+     imp_res_tac WELLTYPED_LEMMA >>
+     metis_tac [term_ok_aconv])
+ >- metis_tac [term_ok_aconv, ACONV_SYM]
+ >- (fs [WELLTYPED] >>
+     imp_res_tac WELLTYPED_LEMMA >>
+     metis_tac [term_ok_aconv]));
 
 val proves_term_ok = store_thm("proves_term_ok",
   ``∀thyh c. thyh |- c ⇒
-      oevery_tmp (λp. term_ok (sigof (FST thyh)) p ∧ p has_type Bool) (oinsert alphaorder c (SND thyh))``,
-  cheat (*Proof need repair *));
-  (*
+      good_oset alphaorder (SND thyh) ∧
+      term_ok (sigof (FST thyh)) c ∧
+      c has_type Bool ∧
+      oevery (λp. term_ok (sigof (FST thyh)) p ∧ p has_type Bool) (SND thyh)``,
   ho_match_mp_tac proves_strongind >>
   strip_tac >- (
     rw[EQUATION_HAS_TYPE_BOOL] >>
     imp_res_tac proves_theory_ok >>
     imp_res_tac theory_ok_sig >>
-    fs[term_ok_equation,term_ok_def] >>
-    fs [oevery_tmp_def] >>
-    rw [oevery_oin]) >>
-  strip_tac >- rw[EQUATION_HAS_TYPE_BOOL] >>
+    fs[term_ok_equation,term_ok_def]) >>
+  strip_tac >- rw[EQUATION_HAS_TYPE_BOOL, good_oset_osingleton, alphaorder_good] >>
   strip_tac >- (
     rw[EQUATION_HAS_TYPE_BOOL] >>
     imp_res_tac term_ok_welltyped >>
     imp_res_tac theory_ok_sig >>
-    rw[term_ok_equation,term_ok_def]) >>
+    rw[term_ok_equation,term_ok_def, good_oset_oempty, alphaorder_good]) >>
   strip_tac >- (
     rw[EQUATION_HAS_TYPE_BOOL] >>
     imp_res_tac proves_theory_ok >>
     imp_res_tac theory_ok_sig >>
     fs[term_ok_equation] >>
     imp_res_tac WELLTYPED_LEMMA >> fs[] >>
-    simp[WELLTYPED] >>
-    match_mp_tac EVERY_TERM_UNION >>
-    simp[EVERY_FILTER] >> fs[EVERY_MEM] ) >>
+    simp[WELLTYPED]
+    >- metis_tac [good_oset_odelete, good_oset_ounion] >>
+    `good_oset alphaorder (odelete alphaorder h1 c') ∧
+     good_oset alphaorder (odelete alphaorder h2 c)`
+             by metis_tac [good_oset_odelete] >>
+    assume_tac (Q.SPEC `sigof (thy:thy)` oresp_equiv_lem) >>
+    rw [oevery_ounion] >>
+    mp_tac (Q.ISPECL [`alphaorder`, `(λp. term_ok (sigof (thy:thy)) p ∧ p has_type Bool)`,
+                       `odelete alphaorder h1 c'`] oevery_oin) >>
+    mp_tac (Q.ISPECL [`alphaorder`, `(λp. term_ok (sigof (thy:thy)) p ∧ p has_type Bool)`,
+                       `odelete alphaorder h2 c`] oevery_oin) >>
+    mp_tac (Q.ISPECL [`alphaorder`, `(λp. term_ok (sigof (thy:thy)) p ∧ p has_type Bool)`,
+                      `h1:term oset`] oevery_oin) >>
+    mp_tac (Q.ISPECL [`alphaorder`, `(λp. term_ok (sigof (thy:thy)) p ∧ p has_type Bool)`,
+                      `h2:term oset`] oevery_oin) >>
+    rw [] >>
+    fs [] >>
+    rfs [oin_odelete]) >>
+ cheat);
+(*
   strip_tac >- (
     rw[EQUATION_HAS_TYPE_BOOL] >>
     imp_res_tac proves_theory_ok >>
