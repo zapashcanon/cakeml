@@ -2633,10 +2633,11 @@ val fromList_thm = Q.store_thm ("fromList_thm",
 val resp_equiv_def = Define `
 resp_equiv cmp f ⇔ !k1 k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v`;
 
+val resp_equiv2_def = Define `
+resp_equiv2 cmp cmp2 f ⇔ !k1 k2. cmp k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal`;
+
 val map_keys_def = Define `
 map_keys cmp f t = fromList cmp (MAP (\(k,v). (f k, v)) (toAscList t))`;
-
-
 
 (*
 val map_keys_thm = Q.store_thm ("map_keys_thm",
@@ -2644,11 +2645,10 @@ val map_keys_thm = Q.store_thm ("map_keys_thm",
   good_cmp cmp1 ∧
   good_cmp cmp2 ∧
   invariant cmp1 t ∧
-  (!k1 k2. cmp1 k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal)
+  resp_equiv2 cmp1 cmp2 f
   ⇒
   invariant cmp2 (map_keys cmp2 f t) ∧
   to_fmap cmp2 (map_keys cmp2 f t) = MAP_KEYS (IMAGE f) (to_fmap cmp1 t)`,
-
  simp [map_keys_def] >>
  rpt gen_tac >>
  DISCH_TAC >>
@@ -2656,11 +2656,10 @@ val map_keys_thm = Q.store_thm ("map_keys_thm",
  rw [MAP_MAP_o, combinTheory.o_DEF] >>
  rw [LAMBDA_PROD] >>
  rw [fmap_eq_flookup] >>
-
-
- fs [combinTheory.o_DEF]
-
- imp_res_tac toAscList_thm >>
+ `lift_key cmp1 (set (toAscList t)) = set (fmap_to_alist (to_fmap cmp1 t))`
+          by metis_tac [toAscList_thm] >>
+ fs [lift_key_def] >>
+ fs [GSYM LIST_TO_SET_MAP] >>
  *)
 
 val every_def = Define `
