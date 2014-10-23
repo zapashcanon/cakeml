@@ -540,7 +540,7 @@ val (updates_rules,updates_ind,updates_cases) = Hol_reln`
    ⇒ (NewConst name ty) updates ctxt) ∧
 
   (* new_specification *)
-  ((thyof ctxt, fromList alphaorder (MAP (λ(s,t). (Var s (typeof t) === t, ())) eqs)) |- prop ∧
+  ((thyof ctxt, oset alphaorder (MAP (λ(s,t). (Var s (typeof t) === t)) eqs)) |- prop ∧
    EVERY
      (λt. CLOSED t ∧
           (∀v. MEM v (tvars t) ⇒ MEM v (tyvars (typeof t))))

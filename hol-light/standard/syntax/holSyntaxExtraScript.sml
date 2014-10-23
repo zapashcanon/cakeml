@@ -1642,7 +1642,7 @@ val theory_ok_sig = store_thm("theory_ok_sig",
   ``∀thy. theory_ok thy ⇒ is_std_sig (sigof thy)``,
   Cases >> rw[theory_ok_def])
 
-val oresp_equiv_lem = Q.prove (
+val ok_has_type_oresp_equiv = Q.store_thm ("ok_has_type_oresp_equiv",
 `!sig. oresp_equiv alphaorder (λp. term_ok sig p ∧ p has_type Bool)`,
  rw [oresp_equiv_def, balanced_mapTheory.resp_equiv_def] >>
  eq_tac >>
@@ -1689,7 +1689,7 @@ val proves_term_ok = store_thm("proves_term_ok",
     `good_oset alphaorder (odelete alphaorder h1 c') ∧
      good_oset alphaorder (odelete alphaorder h2 c)`
              by metis_tac [good_oset_odelete] >>
-    assume_tac (Q.SPEC `sigof (thy:thy)` oresp_equiv_lem) >>
+    assume_tac (Q.SPEC `sigof (thy:thy)` ok_has_type_oresp_equiv) >>
     rw [oevery_ounion] >>
     mp_tac (Q.ISPECL [`alphaorder`, `(λp. term_ok (sigof (thy:thy)) p ∧ p has_type Bool)`,
                        `odelete alphaorder h1 c'`] oevery_oin) >>
