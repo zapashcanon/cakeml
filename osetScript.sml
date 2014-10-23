@@ -48,6 +48,9 @@ oevery f (s:'a oset) ⇔  every (\x y. f x) s`;
 val oexists_def = Define `
 oexists f (s:'a oset) ⇔  exists (\x y. f x) s`;
 
+val oset_def = Define `
+oset cmp l = FOLDR (λx t. oinsert cmp x t) oempty l`;
+
 val oresp_equiv_def = Define `
 oresp_equiv cmp f = resp_equiv cmp (λx y:unit. f x)`;
 
@@ -94,16 +97,94 @@ val good_cmp_ocompare = Q.store_thm ("good_cmp_ocompare",
  rw [ocompare_def, good_cmp_def] >>
  metis_tac [good_cmp_def]);
 
-(* How oin interacts with other operations *)
+val good_oset_oset_help = Q.prove (
+`!cmp s l. good_oset cmp s ⇒ good_oset cmp (FOLDR (λx t. oinsert cmp x t) s l)`,
+ Induct_on `l` >>
+ rw [] >>
+ match_mp_tac good_oset_oinsert >>
+ metis_tac []);
+
+val good_oset_oset = Q.store_thm ("good_oset_oset",
+`!cmp l. good_cmp cmp ⇒ good_oset cmp (oset cmp l)`,
+ rw [oset_def] >>
+ metis_tac [good_oset_oset_help, good_oset_oempty]);
+
+(* oempty theorems *)
 
 val oin_oempty = Q.store_thm ("oin_oinsert[simp]",
 `!cmp x. oin cmp x oempty = F`,
  rw [oin_def, oempty_def, empty_def, member_def]); 
 
+val oimage_oempty = Q.store_thm ("oimage_oempty[simp]",
+`!cmp f. oimage cmp f oempty = oempty`,
+ rw [oimage_def, oempty_def, map_keys_def, empty_def, fromList_def,
+     toAscList_def, foldrWithKey_def]);
+
+val oinsert_oempty = Q.store_thm ("oinsert_oempty[simp]",
+`!cmp x. oinsert cmp x oempty = osingleton x`,
+ rw [oinsert_def, oempty_def, osingleton_def, insert_def, empty_def, singleton_def]);
+
+val odelete_oempty = Q.store_thm ("odelete_oempty[simp]",
+`!cmp x. odelete cmp oempty x = oempty`,
+ rw [odelete_def, oempty_def, delete_def, empty_def]);
+
+val ounion_oempty = Q.store_thm ("ounion_oempty[simp]",
+`!cmp s. ounion cmp oempty s = s ∧ ounion cmp s oempty = s`,
+ rw [ounion_def, oempty_def, union_def, empty_def] >>
+ Cases_on `s` >>
+ rw [union_def]);
+
+val oempty_subset = Q.store_thm ("oempty_subset[simp]",
+`!cmp s. (osubset cmp oempty s ⇔ T) ∧ (osubset cmp s oempty ⇔ s = oempty)`,
+ rw [osubset_def, oempty_def, isSubmapOf_def, isSubmapOfBy_def, empty_def, 
+     submap'_def, size_def] >>
+ Cases_on `s` >>
+ rw [submap'_def, size_def]);
+
+val oevery_oempty = Q.store_thm ("oevery_oempty[simp]",
+`!f. oevery f oempty = T`,
+ rw [oevery_def, oempty_def, every_def, empty_def]);
+
+val oexists_oempty = Q.store_thm ("oexists_oempty[simp]",
+`!f. oexists f oempty = F`,
+ rw [oexists_def, oempty_def, exists_def, empty_def]);
+
+val oset_empty = Q.store_thm ("oset_empty[simp]",
+`!cmp. oset cmp [] = oempty`,
+ rw [oset_def, oempty_def]);
+
+(* singleton theorems *)
+
 val oin_singleton = Q.store_thm ("oin_singleton[simp]",
 `∀cmp x y. oin cmp x (osingleton y) ⇔ cmp x y = Equal`,
  rw [oin_def, osingleton_def, member_def, singleton_def] >>
  EVERY_CASE_TAC);
+
+val oimage_osingleton = Q.store_thm ("oimage_osingleton[simp]",
+`!cmp f x. oimage cmp f (osingleton x) = osingleton (f x)`,
+ rw [oimage_def, osingleton_def, map_keys_def, singleton_def, fromList_def,
+     toAscList_def, foldrWithKey_def, empty_def, insert_def]);
+
+val odelete_osingleton = Q.store_thm ("odelete_osingleton[simp]",
+`!cmp x y. good_cmp cmp ⇒ odelete cmp (osingleton x) y = if cmp x y = Equal then oempty else osingleton x`,
+ rw [odelete_def, oempty_def, delete_def, empty_def, singleton_def, osingleton_def] >>
+ EVERY_CASE_TAC >>
+ rw [balanceR_def, balanceL_def, glue_def] >>
+ metis_tac [cmp_thms]);
+
+val oevery_osingleton = Q.store_thm ("oevery_osingleton[simp]",
+`!f x. oevery f (osingleton x) = f x`,
+ rw [oevery_def, osingleton_def, every_def, singleton_def]);
+
+val oexists_osingleton = Q.store_thm ("oexists_osingleton[simp]",
+`!f x. oexists f (osingleton x) = f x`,
+ rw [oexists_def, osingleton_def, exists_def, singleton_def]);
+
+val oset_singleton = Q.store_thm ("oset_singleton[simp]",
+`!cmp x. oset cmp [x] = osingleton x`,
+ rw [oset_def, osingleton_def]);
+
+(* How oin interacts with other operations *)
 
 val oin_oinsert = Q.store_thm ("oin_oinsert",
 `∀cmp x y s. good_oset cmp s ⇒ (oin cmp x (oinsert cmp y s) ⇔ cmp x y = Equal ∨ oin cmp x s)`,
@@ -169,23 +250,29 @@ val oexists_oin = Q.store_thm ("oexists_oin",
  imp_res_tac exists_thm >>
  rw [lookup_thm, flookup_thm, member_thm]);
 
+val oin_oset_help = Q.prove (
+`!cmp l x s. 
+  good_oset cmp s
+  ⇒
+  (oin cmp x (FOLDR (λx t. oinsert cmp x t) s l) 
+   ⇔ 
+   oin cmp x s ∨ ?y. MEM y l ∧ cmp x y = Equal)`,
+ Induct_on `l` >>
+ rw [] >>
+ imp_res_tac good_oset_oset_help >>
+ rw [oin_oinsert] >>
+ eq_tac >>
+ rw [] >>
+ res_tac >>
+ fs [] >>
+ metis_tac []);
+
+val oin_oset = Q.store_thm ("oin_oset",
+`!cmp l x. good_cmp cmp ⇒ (oin cmp x (oset cmp l) ⇔ ?y. MEM y l ∧ cmp x y = Equal)`,
+ rw [oset_def] >>
+ metis_tac [oin_oset_help, good_oset_oempty, oin_oempty]);
+
 (* Theorems about oevery and oexists *)
-
-val oevery_oempty = Q.store_thm ("oevery_oempty[simp]",
-`!f. oevery f oempty = T`,
- rw [oevery_def, oempty_def, every_def, empty_def]);
-
-val oexists_oempty = Q.store_thm ("oexists_oempty[simp]",
-`!f. oexists f oempty = F`,
- rw [oexists_def, oempty_def, exists_def, empty_def]);
-
-val oevery_osingleton = Q.store_thm ("oevery_osingleton[simp]",
-`!f x. oevery f (osingleton x) = f x`,
- rw [oevery_def, osingleton_def, every_def, singleton_def]);
-
-val oexists_osingleton = Q.store_thm ("oexists_osingleton[simp]",
-`!f x. oexists f (osingleton x) = f x`,
- rw [oexists_def, osingleton_def, exists_def, singleton_def]);
 
 val oevery_oinsert = Q.store_thm ("oevery_oinsert",
 `!f cmp x s.
