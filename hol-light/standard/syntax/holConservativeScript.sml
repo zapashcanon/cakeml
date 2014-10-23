@@ -451,7 +451,16 @@ val remove_const_old_axiom = Q.prove (
  imp_res_tac ALOOKUP_MEM >>
  metis_tac []);
 
-(*
+val proves_alphaorder = Q.prove (
+`!thy assums1 tm1 assums2 tm2.
+  (thy,assums1) |- tm1 ∧
+  ocompare alphaorder assums1 assums2 = Equal ∧ 
+  alphaorder tm1 tm2 = Equal
+  ⇒
+  (thy,assums2) |- tm2`,
+ cheat);
+
+ (*
 val update_conservative = Q.prove (
 `!lhs tm.
   lhs |- tm
@@ -506,19 +515,28 @@ val update_conservative = Q.prove (
      >- metis_tac [theory_ok_remove_upd]
      >- (match_mp_tac (SIMP_RULE (srw_ss()) [PULL_EXISTS, upd_to_subst_def] term_ok_remove_upd) >>
          metis_tac []))
- >- (rw [Once proves_cases] >>
-     ntac 3 disj2_tac >>
-     disj1_tac >>
-     MAP_EVERY qexists_tac [`remove_const (tysof ctxt) consts tm`, `remove_const (tysof ctxt) consts tm'`, 
-                            `oimage alphaorder (remove_const (tysof ctxt) consts) h1`, 
-                            `oimage alphaorder (remove_const (tysof ctxt) consts) h2`] >>
-     rw [remove_const_eq, remove_const_def] >>
-     fs [upd_to_subst_def, rich_listTheory.FILTER_MAP]
-     >- cheat 
-     >- (LAST_X_ASSUM (qspecl_then [`ctxt`, `ConstSpec consts p`] mp_tac) >>
-         rw [upd_to_subst_def])
-     >- (FIRST_X_ASSUM (qspecl_then [`ctxt`, `ConstSpec consts p`] mp_tac) >>
-         rw [upd_to_subst_def]))
+ >- (match_mp_tac proves_alphaorder >>
+     fs [types_of_upd_def, upd_to_subst_def] >>
+     qexists_tac `ounion alphaorder
+                    (odelete alphaorder (oimage alphaorder (remove_const (tysof ctxt) consts) h1) 
+                                        (remove_const (tysof ctxt) consts tm'))
+                    (odelete alphaorder (oimage alphaorder (remove_const (tysof ctxt) consts) h2)
+                                        (remove_const (tysof ctxt) consts tm))` >>
+     qexists_tac `remove_const (tysof ctxt) consts (tm === tm')` >>
+     rw [Once proves_cases]
+     >- (ntac 3 disj2_tac >>
+         disj1_tac >>
+         MAP_EVERY qexists_tac [`remove_const (tysof ctxt) consts tm`, `remove_const (tysof ctxt) consts tm'`, 
+                                `oimage alphaorder (remove_const (tysof ctxt) consts) h1`, 
+                                `oimage alphaorder (remove_const (tysof ctxt) consts) h2`] >>
+         rw [remove_const_eq, remove_const_def] >>
+         fs [upd_to_subst_def, rich_listTheory.FILTER_MAP]
+         >- (LAST_X_ASSUM (qspecl_then [`ctxt`, `ConstSpec consts p`] mp_tac) >>
+             rw [upd_to_subst_def])
+         >- (FIRST_X_ASSUM (qspecl_then [`ctxt`, `ConstSpec consts p`] mp_tac) >>
+             rw [upd_to_subst_def]))
+     >- cheat
+     >- metis_tac [alphaorder_good, comparisonTheory.cmp_thms])
  >- (rw [Once proves_cases] >>
      ntac 4 disj2_tac >>
      disj1_tac >>
