@@ -121,7 +121,7 @@ val pair_cmp_good = Q.store_thm ("pair_cmp_good",
  every_case_tac >>
  metis_tac [pair_cmp_def, comparison_distinct, comparison_case_def, comparison_nchotomy]);
 
-val bool_cmp_good = Q.store_thm ("bol_cmp_good",
+val bool_cmp_good = Q.store_thm ("bool_cmp_good[simp]",
 `good_cmp bool_cmp`,
  simp [good_cmp_def] >>
  rpt conj_tac >>
@@ -132,7 +132,7 @@ val bool_cmp_good = Q.store_thm ("bol_cmp_good",
  every_case_tac >>
  fs []);
 
-val num_cmp_good = Q.store_thm ("num_cmp_good",
+val num_cmp_good = Q.store_thm ("num_cmp_good[simp]",
 `good_cmp num_cmp`,
  simp [good_cmp_def] >>
  rpt conj_tac >>
@@ -143,7 +143,7 @@ val num_cmp_good = Q.store_thm ("num_cmp_good",
  every_case_tac >>
  full_simp_tac (srw_ss()++ARITH_ss) []);
 
-val char_cmp_good = Q.store_thm ("char_cmp_good",
+val char_cmp_good = Q.store_thm ("char_cmp_good[simp]",
 `good_cmp char_cmp`,
  simp [good_cmp_def] >>
  rpt conj_tac >>
@@ -154,7 +154,7 @@ val char_cmp_good = Q.store_thm ("char_cmp_good",
  every_case_tac >>
  full_simp_tac (srw_ss()++ARITH_ss) []);
 
-val string_cmp_good = Q.store_thm ("string_cmp_good",
+val string_cmp_good = Q.store_thm ("string_cmp_good[simp]",
 `good_cmp string_cmp`,
  metis_tac [string_cmp_def, char_cmp_good, list_cmp_good]);
 
@@ -221,18 +221,18 @@ val good_cmp_trans = Q.store_thm ("good_cmp_trans",
  fs [] >>
  metis_tac [cmp_thms]);
 
-val bool_cmp_antisym = Q.store_thm ("bool_cmp_antisym",
+val bool_cmp_antisym = Q.store_thm ("bool_cmp_antisym[simp]",
 `!x y. bool_cmp x y = Equal ⇔ x = y`,
  rw [] >>
  Cases_on `x` >>
  Cases_on `y` >>
  rw [bool_cmp_def]);
 
-val num_cmp_antisym = Q.store_thm ("num_cmp_antisym",
+val num_cmp_antisym = Q.store_thm ("num_cmp_antisym[simp]",
 `!x y. num_cmp x y = Equal ⇔ x = y`,
  rw [num_cmp_def]);
 
-val char_cmp_antisym = Q.store_thm ("char_cmp_antisym",
+val char_cmp_antisym = Q.store_thm ("char_cmp_antisym[simp]",
 `!x y. char_cmp x y = Equal ⇔ x = y`,
  rw [char_cmp_def, num_cmp_antisym] >>
  rw [ORD_11]);
@@ -245,7 +245,7 @@ val list_cmp_antisym = Q.store_thm ("list_cmp_antisym",
  rw [] >>
  metis_tac [comparison_distinct]);
 
-val string_cmp_antisym = Q.store_thm ("string_cmp_antisym",
+val string_cmp_antisym = Q.store_thm ("string_cmp_antisym[simp]",
 `!x y. string_cmp x y = Equal ⇔ x = y`,
  metis_tac [string_cmp_def, char_cmp_antisym, list_cmp_antisym]);
 
@@ -285,5 +285,21 @@ val option_cmp2_antisym = Q.store_thm ("option_cmp2_antisym",
  every_case_tac >>
  rw [] >>
  metis_tac [comparison_distinct]);
+
+val resp_equiv_def = Define `
+resp_equiv cmp f ⇔ !k1 k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v`;
+
+val resp_equiv2_def = Define `
+resp_equiv2 cmp cmp2 f ⇔ !k1 k2. cmp k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal`;
+
+val antisym_resp_equiv = Q.prove (
+`!cmp f. 
+  (!x y. cmp x y = Equal ⇒ x = y) 
+  ⇒ 
+  resp_equiv cmp f ∧ !cmp2. good_cmp cmp2 ⇒ resp_equiv2 cmp cmp2 f`,
+ rw [resp_equiv_def, resp_equiv2_def] >>
+ metis_tac [cmp_thms]);
+
+
 
 val _ = export_theory ();

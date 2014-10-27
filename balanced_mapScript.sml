@@ -2630,12 +2630,6 @@ val fromList_thm = Q.store_thm ("fromList_thm",
 
 (* ------------------------ Extra stuff, not from ghc ----------------- *)
 
-val resp_equiv_def = Define `
-resp_equiv cmp f ⇔ !k1 k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v`;
-
-val resp_equiv2_def = Define `
-resp_equiv2 cmp cmp2 f ⇔ !k1 k2. cmp k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal`;
-
 val map_keys_def = Define `
 map_keys cmp f t = fromList cmp (MAP (\(k,v). (f k, v)) (toAscList t))`;
 
