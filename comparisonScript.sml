@@ -23,6 +23,17 @@ good_cmp cmp ⇔
   (!x y z. cmp x y = Equal ∧ cmp y z = Equal ⇒ cmp x z = Equal) ∧
   (!x y z. cmp x y = Less ∧ cmp y z = Less ⇒ cmp x z = Less)`;
 
+val good_cmp_thm = Q.store_thm ("good_cmp_thm",
+`!cmp. 
+  good_cmp cmp ⇔
+  (!x. cmp x x = Equal) ∧
+  (!x y z.
+    (cmp x y = Greater ⇔ cmp y x = Less) ∧
+    (cmp x y = Less ∧ cmp y z = Equal ⇒ cmp x z = Less) ∧
+    (cmp x y = Less ∧ cmp y z = Less ⇒ cmp x z = Less))`,
+ rw [good_cmp_def] >>
+ metis_tac [comparison_distinct, comparison_nchotomy]);
+
 val cmp_thms = save_thm ("cmp_thms", LIST_CONJ [comparison_distinct, comparison_case_def, comparison_nchotomy, good_cmp_def])
 
 val option_cmp_def = Define `
