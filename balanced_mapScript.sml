@@ -2556,11 +2556,11 @@ val splitLookup_thm = Q.store_thm ("splitLookup_thm",
      (*
 val submap'_thm = Q.prove (
 `!cmp f t1 t2.
- good_cmp cmp ∧
- invariant cmp t1 ∧
- invariant cmp t2
- ⇒
- (submap' cmp f t1 t2 ⇔ !k v. lookup cmp k t1 = SOME v ⇒ ?v'. lookup cmp k t2 = SOME v' ∧ f v v')`, 
+  good_cmp cmp ∧
+  invariant cmp t1 ∧
+  invariant cmp t2
+  ⇒
+  (submap' cmp f t1 t2 ⇔ !k v. lookup cmp k t1 = SOME v ⇒ ?v'. lookup cmp k t2 = SOME v' ∧ f v v')`, 
  ho_match_mp_tac (fetch "-" "submap'_ind") >>
  rpt conj_tac
  >- rw [lookup_def, submap'_def]
@@ -2597,17 +2597,24 @@ val submap'_thm = Q.prove (
      imp_res_tac lookup_thm >>
      fs [lookup_def, to_fmap_def] >>
      metis_tac [cmp_thms, NOT_SOME_NONE])
- >- (fs [to_fmap_def, invariant_eq] >>
-     rw [submap'_def, lookup_def] >>
+ >- (simp [submap'_def] >>
+     qabbrev_tac `t = Bin v20 v21 v22 v23 v24` >>
+     pop_assum (fn _ => all_tac) >>
+     fs [invariant_eq] >>
+     rw [lookup_def] >>
      eq_tac >>
      simp []
      >- (rw [] >>
-         `FLOOKUP ((to_fmap cmp v23 ⊌ to_fmap cmp v24) |+ (key_set cmp v21,v22)) (key_set cmp k) =
-          FLOOKUP ((to_fmap cmp lt ⊌ to_fmap cmp gt) |+ (key_set cmp kx,x')) (key_set cmp k)` 
-                      by metis_tac [] >>
-         fs [FLOOKUP_UPDATE] >>
+         imp_res_tac lookup_thm >>
+         rw [FLOOKUP_UPDATE] >>
+         rfs [key_set_eq] >>
+         fs []
+         >- (`cmp k kx = Equal` by metis_tac [cmp_thms] >>
+             fs []) >>
+         rw [FLOOKUP_FUNION] >>
          cheat) >>
      strip_tac >>
+     rw [] >>
      cheat));
      *)
 
