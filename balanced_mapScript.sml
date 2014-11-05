@@ -520,7 +520,7 @@ val toAscList_def = Define `
 toAscList t = foldrWithKey (\k x xs. (k,x)::xs) [] t`;
 
 val compare_def = Define `
-compare cmp t1 t2 = list_cmp cmp (toAscList t1) (toAscList t2)`;
+compare cmp1 cmp2 t1 t2 = list_cmp (pair_cmp cmp1 cmp2) (toAscList t1) (toAscList t2)`;
 
 val map_def = Define `
 (map _ Tip ⇔ Tip) ∧
@@ -2438,13 +2438,57 @@ val toAscList_thm = Q.store_thm ("toAscList_thm",
  qspecl_then [`cmp`, `[]`, `t`] mp_tac toAscList_helper >>
  simp [toAscList_def, lift_key_def]);
 
-val compare_thm = Q.store_thm ("compare_thm",
-`!cmp. good_cmp cmp ⇒ good_cmp (compare cmp)`,
- ntac 2 strip_tac >>
+val compare_good_cmp = Q.store_thm ("compare_good_cmp",
+`!cmp1 cmp2. good_cmp cmp1 ∧ good_cmp cmp2 ⇒ good_cmp (compare cmp1 cmp2)`,
+ rw [] >>
+ imp_res_tac pair_cmp_good >>
  imp_res_tac list_cmp_good >>
  rpt (pop_assum mp_tac) >>
  REWRITE_TAC [good_cmp_def, compare_def] >>
  metis_tac []);
+
+ (*
+val compare_thm = Q.store_thm ("compare_thm",
+`!cmp1 cmp2 t1 t2. 
+  good_cmp cmp1 ∧ 
+  good_cmp cmp2 ∧ 
+  invariant cmp1 t1 ∧
+  invariant cmp1 t2 ∧
+  compare cmp1 cmp2 t1 t2 = Equal 
+  ⇒ 
+  fmap_rel (\x y. cmp2 x y = Equal) (to_fmap cmp1 t1) (to_fmap cmp1 t2)`,
+
+ rw [compare_def, fmap_rel_OPTREL_FLOOKUP, OPTREL_def] >>
+ imp_res_tac toAscList_thm >>
+ fs [lift_key_def, list_cmp_equal_list_rel, pair_cmp_def] >>
+ fs [key_set_def, EXTENSION, LAMBDA_PROD, FORALL_PROD, EXISTS_PROD] >>
+ fs [LIST_REL_EL_EQN] >>
+ Cases_on `FLOOKUP (to_fmap cmp1 t1) k` >>
+ rw []
+ >- cheat
+ >- (res_tac >>
+     fs [MEM_EL] >>
+     res_tac >>
+     Cases_on `EL n (toAscList t1)` >>
+     Cases_on `EL n (toAscList t2)` >>
+     fs [] >>
+     every_case_tac >>
+     fs [] >>
+     rw [] >>
+     qexists_tac `r'` >>
+     rw [] >>
+
+     first_x_assum (qspecl_then [`r'`, `n`] mp_tac) >>
+     rw [] >>
+     first_x_assum (match_mp_tac o SIMP_RULE (srw_ss()) [AND_IMP_INTRO]) >>
+     qexists_tac `n` >>
+     rw []
+     
+metis_tac [FST, SND, pair_CASES, PAIR_EQ]
+
+
+     cheat));
+     *)
 
 val map_thm = Q.store_thm ("map_thm",
 `!t.

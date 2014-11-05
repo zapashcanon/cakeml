@@ -311,4 +311,14 @@ val antisym_resp_equiv = Q.store_thm ("antisym_resp_equiv",
  rw [resp_equiv_def, resp_equiv2_def] >>
  metis_tac [cmp_thms]);
 
+val list_cmp_equal_list_rel = Q.store_thm ("list_cmp_equal_list_rel",
+`!cmp l1 l2.
+  list_cmp cmp l1 l2 = Equal ⇔ LIST_REL (\x y. cmp x y = Equal) l1 l2`,
+ Induct_on `l1` >>
+ rw [] >>
+ Cases_on `l2` >>
+ fs [list_cmp_def] >>
+ every_case_tac >>
+ fs []);
+
 val _ = export_theory ();
