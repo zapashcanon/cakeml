@@ -113,6 +113,12 @@ val DELETE_INTER2 = Q.prove (
 `∀s t x. t ∩ (s DELETE x) = s ∩ t DELETE x`,
  metis_tac [DELETE_INTER, INTER_COMM]);
 
+val POS_CARD_HAS_MEM = Q.prove (
+`!s. FINITE s ⇒ 0 < CARD s ⇒ ?x. x ∈ s`,
+ Cases_on `s` >>
+ rw [CARD_INSERT] >>
+ metis_tac []);
+
 val every_case_tac = BasicProvers.EVERY_CASE_TAC;
 
 (* ------------------------ Finite maps up to key equivalence ------------------------ *)
@@ -2692,6 +2698,41 @@ val submap'_thm = Q.prove (
              res_tac >>
              fs [key_set_cmp_def, key_set_def] >>
              metis_tac [cmp_thms]))));
+
+val isSubmapOfBy_thm = Q.store_thm ("isSubmapOfBy_thm",
+`!cmp f t1 t2.
+  good_cmp cmp ∧
+  invariant cmp t1 ∧
+  invariant cmp t2
+  ⇒
+  (isSubmapOfBy cmp f t1 t2 ⇔ !k v. lookup cmp k t1 = SOME v ⇒ ?v'. lookup cmp k t2 = SOME v' ∧ f v v')`,
+ rw [isSubmapOfBy_def] >>
+ Cases_on `size t1 ≤ size t2` >>
+ rw [submap'_thm] >>
+ fs [NOT_LESS_EQUAL] >>
+ imp_res_tac size_thm >>
+ imp_res_tac lookup_thm >>
+ fs [FCARD_DEF] >>
+ `FINITE (FDOM (to_fmap cmp t1)) ∧ FINITE (FDOM (to_fmap cmp t2))` by rw [] >>
+ imp_res_tac LESS_CARD_DIFF >>
+ full_simp_tac std_ss [] >>
+ `FINITE (FDOM (to_fmap cmp t1) DIFF FDOM (to_fmap cmp t2))` by rw [] >>
+ imp_res_tac POS_CARD_HAS_MEM >>
+ fs [] >>
+ rw [FLOOKUP_DEF] >>
+ imp_res_tac to_fmap_key_set >>
+ rw [] >>
+ qexists_tac `k` >>
+ rw []);
+
+val isSubmapOf_thm = Q.store_thm ("isSubmapOf_thm",
+`!cmp t1 t2.
+  good_cmp cmp ∧
+  invariant cmp t1 ∧
+  invariant cmp t2
+  ⇒
+  (isSubmapOf cmp t1 t2 ⇔ !k v. lookup cmp k t1 = SOME v ⇒ lookup cmp k t2 = SOME v)`,
+ rw [isSubmapOf_def, isSubmapOfBy_thm]);
 
 val fromList_thm = Q.store_thm ("fromList_thm",
 `!cmp l.

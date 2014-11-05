@@ -224,7 +224,10 @@ val oin_oimage = Q.store_thm ("oin_oimage",
 
 val osubset_thm = Q.store_thm ("osubset_thm",
 `!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (osubset cmp s1 s2 ⇔ (!x. oin cmp x s1 ⇒ oin cmp x s2))`,
- cheat);
+ rw [osubset_def, good_oset_def, isSubmapOf_thm, oin_def] >>
+ rw [member_thm, lookup_thm, FLOOKUP_DEF] >>
+ eq_tac >>
+ rw []);
 
 val oextension = Q.store_thm ("oextension",
 `!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (ocompare cmp s1 s2 = Equal ⇔ (!x. oin cmp x s1 ⇔ oin cmp x s2))`,
