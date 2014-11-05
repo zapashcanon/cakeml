@@ -2447,7 +2447,6 @@ val compare_good_cmp = Q.store_thm ("compare_good_cmp",
  REWRITE_TAC [good_cmp_def, compare_def] >>
  metis_tac []);
 
- (*
 val compare_thm = Q.store_thm ("compare_thm",
 `!cmp1 cmp2 t1 t2. 
   good_cmp cmp1 ∧ 
@@ -2457,16 +2456,20 @@ val compare_thm = Q.store_thm ("compare_thm",
   compare cmp1 cmp2 t1 t2 = Equal 
   ⇒ 
   fmap_rel (\x y. cmp2 x y = Equal) (to_fmap cmp1 t1) (to_fmap cmp1 t2)`,
-
  rw [compare_def, fmap_rel_OPTREL_FLOOKUP, OPTREL_def] >>
  imp_res_tac toAscList_thm >>
  fs [lift_key_def, list_cmp_equal_list_rel, pair_cmp_def] >>
  fs [key_set_def, EXTENSION, LAMBDA_PROD, FORALL_PROD, EXISTS_PROD] >>
  fs [LIST_REL_EL_EQN] >>
+ pop_assum (mp_tac o GSYM) >>
+ pop_assum (mp_tac o GSYM) >>
+ rw [] >>
  Cases_on `FLOOKUP (to_fmap cmp1 t1) k` >>
  rw []
- >- cheat
- >- (res_tac >>
+ >- (disj1_tac >>
+     Cases_on `FLOOKUP (to_fmap cmp1 t2) k` >>
+     fs []  >>
+     rfs [] >>
      fs [MEM_EL] >>
      res_tac >>
      Cases_on `EL n (toAscList t1)` >>
@@ -2475,20 +2478,28 @@ val compare_thm = Q.store_thm ("compare_thm",
      every_case_tac >>
      fs [] >>
      rw [] >>
-     qexists_tac `r'` >>
+     first_x_assum (qspecl_then [`k`] mp_tac) >>
+     strip_tac >>
+     rfs [] >>
+     pop_assum (qspecl_then [`r`, `q`] mp_tac) >>
      rw [] >>
-
-     first_x_assum (qspecl_then [`r'`, `n`] mp_tac) >>
+     metis_tac [NOT_SOME_NONE, cmp_thms])
+ >- (rfs [] >>
+     fs [MEM_EL] >>
+     rfs [] >>
+     res_tac >>
+     Cases_on `EL n (toAscList t1)` >>
+     Cases_on `EL n (toAscList t2)` >>
+     fs [] >>
+     every_case_tac >>
+     fs [] >>
      rw [] >>
-     first_x_assum (match_mp_tac o SIMP_RULE (srw_ss()) [AND_IMP_INTRO]) >>
-     qexists_tac `n` >>
+     MAP_EVERY qexists_tac [`r`, `r'`] >>
      rw []
-     
-metis_tac [FST, SND, pair_CASES, PAIR_EQ]
-
-
-     cheat));
-     *)
+     >- metis_tac [] >>
+     qexists_tac `q'` >>
+     rw [] >>
+     metis_tac [cmp_thms]));
 
 val map_thm = Q.store_thm ("map_thm",
 `!t.
@@ -2810,6 +2821,7 @@ val map_keys_thm = Q.store_thm ("map_keys_thm",
   ⇒
   invariant cmp2 (map_keys cmp2 f t) ∧
   to_fmap cmp2 (map_keys cmp2 f t) = MAP_KEYS (IMAGE f) (to_fmap cmp1 t)`,
+
  simp [map_keys_def] >>
  rpt gen_tac >>
  DISCH_TAC >>
@@ -2821,7 +2833,23 @@ val map_keys_thm = Q.store_thm ("map_keys_thm",
           by metis_tac [toAscList_thm] >>
  fs [lift_key_def] >>
  fs [GSYM LIST_TO_SET_MAP] >>
- *)
+ fs [EXTENSION, MEM_MAP, LAMBDA_PROD, EXISTS_PROD, FORALL_PROD] >>
+ Cases_on `FLOOKUP (MAP_KEYS (IMAGE f) (to_fmap cmp1 t)) k` >>
+ fs []
+ >- (rw [ALOOKUP_NONE, MEM_MAP, LAMBDA_PROD, EXISTS_PROD] >>
+     fs [FLOOKUP_DEF, MAP_KEYS_def] >>
+     CCONTR_TAC >>
+     fs [] >>
+     rw [] >>
+     fs [resp_equiv2_def] >>
+
+     fs [PULL_EXISTS, PULL_FORALL, key_set_def, EXTENSION]
+
+     first_x_assum (qspecl_then [`key_set cmp1 p_1'`, `p_2`] assume_tac) >>
+     fs [FLOOKUP_DEF, MAP_KEYS_def] >>
+     fs [EXTENSION, key_set_def] >>
+     metis_tac [cmp_thms]
+     *)
 
 val every_def = Define `
 (every f Tip = T) ∧
