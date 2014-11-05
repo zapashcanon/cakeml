@@ -2553,14 +2553,13 @@ val splitLookup_thm = Q.store_thm ("splitLookup_thm",
      rfs [key_set_eq] >>
      metis_tac [cmp_thms]));
 
-     (*
 val submap'_thm = Q.prove (
 `!cmp f t1 t2.
   good_cmp cmp ∧
   invariant cmp t1 ∧
   invariant cmp t2
   ⇒
-  (submap' cmp f t1 t2 ⇔ !k v. lookup cmp k t1 = SOME v ⇒ ?v'. lookup cmp k t2 = SOME v' ∧ f v v')`, 
+  (submap' cmp f t1 t2 ⇔ !k v. lookup cmp k t1 = SOME v ⇒ ?v'. lookup cmp k t2 = SOME v' ∧ f v v')`,
  ho_match_mp_tac (fetch "-" "submap'_ind") >>
  rpt conj_tac
  >- rw [lookup_def, submap'_def]
@@ -2612,11 +2611,87 @@ val submap'_thm = Q.prove (
          >- (`cmp k kx = Equal` by metis_tac [cmp_thms] >>
              fs []) >>
          rw [FLOOKUP_FUNION] >>
-         cheat) >>
-     strip_tac >>
-     rw [] >>
-     cheat));
-     *)
+         Cases_on `cmp k kx` >>
+         fs [] >>
+         res_tac
+         >- (qexists_tac `v''` >>
+             rw [])
+         >- (rfs [key_ordered_to_fmap] >>
+             `FLOOKUP (to_fmap cmp lt) (key_set cmp k) = NONE`
+                       by (fs [FLOOKUP_DEF] >>
+                           CCONTR_TAC >>
+                           fs [] >>
+                           res_tac >>
+                           fs [key_set_cmp_def, key_set_def] >>
+                           metis_tac [cmp_thms]) >>
+             rw [])
+         >- metis_tac [cmp_thms]) >>
+     rw []
+     >- (first_assum (qspecl_then [`kx`, `x`] assume_tac) >>
+         every_case_tac >>
+         fs []
+         >- metis_tac [cmp_thms]
+         >- metis_tac [cmp_thms] >>
+         imp_res_tac lookup_thm >>
+         fs [] >>
+         rfs [] >>
+         rw [])
+     >- (imp_res_tac lookup_thm >>
+         fs [] >>
+         rfs [FLOOKUP_UPDATE] >>
+         rw [] >>
+         last_assum (qspecl_then [`k`] assume_tac) >>
+         Cases_on `cmp k kx` >>
+         fs [] >>
+         rfs [key_set_eq]
+         >- (`cmp kx k ≠ Equal` by metis_tac [cmp_thms] >>
+             fs [FLOOKUP_FUNION] >>
+             Cases_on `FLOOKUP (to_fmap cmp lt) (key_set cmp k)` >>
+             fs [FLOOKUP_DEF] >>
+             rfs [key_ordered_to_fmap] >>
+             res_tac >>
+             fs [key_set_cmp_def, key_set_def] >>
+             metis_tac [cmp_thms])
+         >- (`cmp kx k ≠ Equal` by metis_tac [cmp_thms] >>
+             fs [FLOOKUP_DEF] >>
+             rfs [key_ordered_to_fmap] >>
+             res_tac >>
+             fs [key_set_cmp_def, key_set_def] >>
+             metis_tac [cmp_thms])
+         >- (`cmp kx k = Equal` by metis_tac [cmp_thms] >>
+             fs [FLOOKUP_DEF] >>
+             rfs [key_ordered_to_fmap] >>
+             res_tac >>
+             fs [key_set_cmp_def, key_set_def] >>
+             metis_tac [cmp_thms]))
+     >- (imp_res_tac lookup_thm >>
+         fs [] >>
+         rfs [FLOOKUP_UPDATE] >>
+         rw [] >>
+         last_assum (qspecl_then [`k`] assume_tac) >>
+         Cases_on `cmp k kx` >>
+         fs [] >>
+         rfs [key_set_eq]
+         >- (`cmp kx k ≠ Equal` by metis_tac [cmp_thms] >>
+             fs [FLOOKUP_DEF] >>
+             rfs [key_ordered_to_fmap] >>
+             res_tac >>
+             fs [key_set_cmp_def, key_set_def] >>
+             metis_tac [cmp_thms])
+         >- (`cmp kx k ≠ Equal` by metis_tac [cmp_thms] >>
+             fs [FLOOKUP_FUNION] >>
+             Cases_on `FLOOKUP (to_fmap cmp lt) (key_set cmp k)` >>
+             fs [FLOOKUP_DEF] >>
+             rfs [key_ordered_to_fmap] >>
+             res_tac >>
+             fs [key_set_cmp_def, key_set_def] >>
+             metis_tac [cmp_thms])
+         >- (`cmp kx k = Equal` by metis_tac [cmp_thms] >>
+             fs [FLOOKUP_DEF] >>
+             rfs [key_ordered_to_fmap] >>
+             res_tac >>
+             fs [key_set_cmp_def, key_set_def] >>
+             metis_tac [cmp_thms]))));
 
 val fromList_thm = Q.store_thm ("fromList_thm",
 `!cmp l.
