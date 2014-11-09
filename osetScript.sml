@@ -40,7 +40,7 @@ val osubset_def = Define `
 osubset cmp (s1:'a oset) (s2:'a oset) ⇔ isSubmapOf cmp s1 s2`;
 
 val ocompare_def = Define `
-ocompare cmp (s1:'a oset) (s2:'a oset) = compare (\(x,y) (x',y'). cmp x x') s1 s2`;
+ocompare cmp (s1:'a oset) (s2:'a oset) = compare cmp (\x y. Equal) s1 s2`;
 
 val oevery_def = Define `
 oevery f (s:'a oset) ⇔  every (\x y. f x) s`;
@@ -86,14 +86,10 @@ val good_oset_oimage = Q.store_thm ("good_oset_oimage",
 val good_cmp_ocompare = Q.store_thm ("good_cmp_ocompare",
 `!cmp f s. good_cmp cmp ⇒ good_cmp (ocompare cmp)`,
  rw [] >>
- `good_cmp (\(x,y:unit) (x',y':unit). cmp x x')` 
+ `good_cmp (\(x:unit) (y:unit). Equal)` 
             by (rw [good_cmp_def, LAMBDA_PROD, FORALL_PROD] >>
                 metis_tac [good_cmp_def]) >>
- imp_res_tac compare_thm >>
- pop_assum mp_tac >>
- pop_assum (fn _ => all_tac) >>
- pop_assum (fn _ => all_tac) >>
- rw [] >>
+ imp_res_tac compare_good_cmp >>
  rw [ocompare_def, good_cmp_def] >>
  metis_tac [good_cmp_def]);
 
@@ -231,7 +227,24 @@ val osubset_thm = Q.store_thm ("osubset_thm",
 
 val oextension = Q.store_thm ("oextension",
 `!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (ocompare cmp s1 s2 = Equal ⇔ (!x. oin cmp x s1 ⇔ oin cmp x s2))`,
- cheat);
+ rw [good_oset_def, ocompare_def] >>
+ `good_cmp (\(x:unit) (y:unit). Equal)` 
+            by (rw [good_cmp_def, LAMBDA_PROD, FORALL_PROD] >>
+                metis_tac [good_cmp_def]) >>
+ eq_tac >>
+ rw []
+ >- (`fmap_rel (\x y. (λx y:unit. Equal) x y = Equal) (to_fmap cmp s1) (to_fmap cmp s2)`
+             by (match_mp_tac compare_thm >>
+                 rw []) >>
+     fs [fmap_rel_OPTREL_FLOOKUP, OPTREL_def, oin_def] >>
+     imp_res_tac member_thm >>
+     rw [] >>
+     fs [FLOOKUP_DEF] >>
+     metis_tac [])
+ >- (fs [oin_def] >>
+     imp_res_tac member_thm >>
+     fs [] >>
+     cheat));
 
 val oevery_oin = Q.store_thm ("oevery_oin",
 `!cmp f s. 
