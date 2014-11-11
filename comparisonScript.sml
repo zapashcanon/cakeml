@@ -301,7 +301,10 @@ val resp_equiv_def = Define `
 resp_equiv cmp f ⇔ !k1 k2 v. cmp k1 k2 = Equal ⇒ f k1 v = f k2 v`;
 
 val resp_equiv2_def = Define `
-resp_equiv2 cmp cmp2 f ⇔ !k1 k2. cmp k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal`;
+resp_equiv2 cmp cmp2 f ⇔ (!k1 k2. cmp k1 k2 = Equal ⇒ cmp2 (f k1) (f k2) = Equal)`;
+
+val equiv_inj_def = Define `
+equiv_inj cmp cmp2 f ⇔ (!k1 k2. cmp2 (f k1) (f k2) = Equal ⇒ cmp k1 k2 = Equal)`;
 
 val antisym_resp_equiv = Q.store_thm ("antisym_resp_equiv",
 `!cmp f. 

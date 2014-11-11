@@ -119,6 +119,11 @@ val POS_CARD_HAS_MEM = Q.prove (
  rw [CARD_INSERT] >>
  metis_tac []);
 
+val all_distinct_up_to_def = Define `
+(all_distinct_up_to cmp [] ⇔ T) ∧
+(all_distinct_up_to cmp (k::t) ⇔
+  (∀k'. cmp k k' = Equal ⇒ ~MEM k' t) ∧ all_distinct_up_to cmp t)`;
+
 val every_case_tac = BasicProvers.EVERY_CASE_TAC;
 
 (* ------------------------ Finite maps up to key equivalence ------------------------ *)
@@ -2905,7 +2910,229 @@ val fromList_thm = Q.store_thm ("fromList_thm",
 val map_keys_def = Define `
 map_keys cmp f t = fromList cmp (MAP (\(k,v). (f k, v)) (toAscList t))`;
 
-(*
+val in_lift_key = Q.prove (
+`!cmp k v l.
+  good_cmp cmp ∧
+  SORTED (λ(x,y:'a) (x',y':'a). cmp x x' = Less) l ∧
+  transitive (λ(x,y:'a) (x',y':'a). cmp x x' = Less)
+  ⇒
+  ((k,v) ∈ lift_key cmp (set l) ⇔ ALOOKUP (MAP (λ(x,y). (key_set cmp x, y)) l) k = SOME v)`,
+ Induct_on `l` >>
+ fs [lift_key_def, key_set_def, LAMBDA_PROD, EXISTS_PROD, EXTENSION, FORALL_PROD] >>
+ rw [] >>
+ fs [] >>
+ eq_tac >>
+ rw [] >>
+ fs [SORTED_EQ] >>
+ res_tac >>
+ fs [] >>
+ metis_tac [cmp_thms]);
+
+ (*
+val alookup_unit_lem = Q.prove (
+`!cmp1 cmp2 f k l x.
+  good_cmp cmp1 ∧
+  good_cmp cmp2 ∧
+  resp_equiv2 cmp1 cmp2 f 
+  ⇒
+  (ALOOKUP (MAP (\(k,v). (key_set cmp1 k, ())) l) (key_set cmp1 x') = 
+   ALOOKUP (MAP (\(k,v). (key_set cmp2 (f k), ())) l) (key_set cmp2 (f x')))`,
+
+ Induct_on `l` >>
+ rw [] >>
+ PairCases_on `h` >>
+ rw [] >>
+ rfs [key_set_eq, resp_equiv2_def] >>
+ >- (rfs [] >>
+     fs [EXTENSION, key_set_def] >>
+     match_mp_tac (METIS_PROVE [] ``F⇒x``) >>
+     rw [] >>
+     pop_assum mp_tac >>
+     simp [] >>
+     eq_tac >>
+     rw [] >>
+     fs [resp_equiv2_def]
+     >- (qexists_tac `key_set cmp2 (f h0)` >>
+         rw [key_set_def] >>
+         metis_tac [cmp_thms])
+     >- metis_tac [cmp_thms])
+ >- (rfs [] >>
+     rw [] >>
+     fs [EXTENSION, key_set_def] >>
+     Cases_on `x ∈ k` >>
+     fs [resp_equiv2_def] >>
+     first_x_assum (qspecl_then [`f x`] assume_tac) >>
+     fs [] >>
+     Cases_on `cmp2 (f h0) (f x) = Equal` >>
+     fs []
+metis_tac [cmp_thms]
+
+
+ rfs [key_set_eq] >>
+     `IMAGE f (key_set cmp1 h0) ⊆ key_set cmp2 (f h0)` by metis_tac [key_set_map] >>
+     fs [SUBSET_DEF, EXTENSION] >>
+     `x ∈ key_set cmp2 (f h0) ∧ ¬?x'.  x = f x' ∧ x' ∈ key_set cmp1 h0` by metis_tac []
+     fs []
+
+     fs [key_set_def, resp_equiv2_def, EXTENSION] >>
+     rw [] >>
+     rfs [] >>
+     Cases_on `h1 = v` >>
+     rw [] >>
+
+     pop_assum mp_tac >>
+     match_mp_tac (METIS_PROVE [] ``x ⇒ (~x ⇒ y)``) >>
+     eq_tac >>
+     rw []
+
+     metis_tac [cmp_thms]
+ >- (`IMAGE f k ≠ {}` by cheat >>
+     imp_res_tac CHOICE_DEF >>
+     fs [] >>
+     fs [] >>
+
+     rfs [key_set_eq] >>
+     fs [key_set_def, resp_equiv2_def] >>
+     metis_tac [cmp_thms])
+
+ fs [resp_equiv2_def, key_set_def, EXTENSION] >>
+ rfs []
+ metis_tac []
+ *)
+
+val bigunion_key_sets = Q.prove (
+`!cmp1.
+  good_cmp cmp1 ∧
+  good_cmp cmp2 ∧
+  resp_equiv2 cmp1 cmp2 f
+  ⇒
+  BIGUNION (IMAGE (\x. key_set cmp2 (f x)) (key_set cmp1 x)) =
+  key_set cmp2 (CHOICE (IMAGE f (key_set cmp1 x)))`,
+ rw [EXTENSION] >>
+ `IMAGE f (key_set cmp1 x) ≠ {}` by (rw [EXTENSION, key_set_def] >> metis_tac [cmp_thms]) >>
+ imp_res_tac CHOICE_DEF >>
+ fs [key_set_def] >>
+ eq_tac >>
+ rw [] >>
+ rfs [resp_equiv2_def] 
+ >- metis_tac [cmp_thms] >>
+ qexists_tac `key_set cmp2 (f x)` >>
+ rw [key_set_def] >>
+ metis_tac [cmp_thms]);
+
+val image_lem = Q.prove (
+`good_cmp cmp1 
+ ⇒
+ IMAGE (λx. key_set cmp2 (f x)) (key_set cmp1 k'') = 
+ { key_set cmp2 (f x) | x | cmp1 x k'' = Equal }`,
+ rw [EXTENSION,key_set_def] >>
+ metis_tac [cmp_thms]);
+
+ (*
+val map_keys_thm = Q.store_thm ("map_keys_thm",
+`!cmp1 cmp2 f t.
+  good_cmp cmp1 ∧
+  good_cmp cmp2 ∧
+  invariant cmp1 t ∧
+  resp_equiv2 cmp1 cmp2 f ∧
+  equiv_inj cmp1 cmp2 f
+  ⇒
+  invariant cmp2 (map_keys cmp2 f t) ∧
+  to_fmap cmp2 (map_keys cmp2 f t) = MAP_KEYS (BIGUNION o IMAGE (key_set cmp2 o f)) (to_fmap cmp1 t)`,
+
+ simp [map_keys_def] >>
+ rpt gen_tac >>
+ DISCH_TAC >>
+ inv_mp_tac fromList_thm >>
+ rw [MAP_MAP_o, combinTheory.o_DEF] >>
+ rw [fmap_eq_flookup] >>
+ `SORTED (λ(x,y) (x',y'). cmp1 x x' = Less) (toAscList t) ∧
+  lift_key cmp1 (set (toAscList t)) = set (fmap_to_alist (to_fmap cmp1 t))`
+            by metis_tac [toAscList_thm] >>
+ pop_assum mp_tac >>
+ simp [EXTENSION, MEM_MAP, LAMBDA_PROD, EXISTS_PROD, FORALL_PROD] >>
+ `transitive (λ(x,y:'c) (x',y':'c). cmp1 x x' = Less)` by metis_tac [good_cmp_trans] >>
+ rw [in_lift_key] >>
+ fs [] >>
+ rw [FLOOKUP_DEF] >>
+ `INJ (λx. BIGUNION (IMAGE (λx. key_set cmp2 (f x)) x)) (FDOM (to_fmap cmp1 t)) UNIV`
+          by rw [INJ_DEF] >>
+          imp_res_tac to_fmap_key_set
+          rw [] >>
+          CCONTR_TAC >>
+          fs [equiv_inj_def] >>
+          rfs [key_set_eq] >>
+          `cmp2 (f k'') (f k') ≠ Equal` by metis_tac []
+          rfs [image_lem]
+
+          fs [EXTENSION]
+          fs [PULL_EXISTS, PULL_FORALL]
+
+
+          rfs [bigunion_key_sets]
+
+              fs [resp_equiv2_def, equiv_inj_def]
+
+              rw [key_set_def]
+              fs [key_set_def]
+              CCONTR_TAC 
+              Cases_on `cmp1 k' k'' = Equal` >>
+              fs []
+              `cmp2 (f k') (f k'') ≠ Equal` by metis_tac [cmp_thms]
+metis_tac [cmp_thms]
+
+ Cases_on `ALOOKUP (MAP (λ(p1,p2). (key_set cmp2 (f p1),())) (toAscList t)) k = NONE` >>
+ fs []
+
+ Cases_on `?x. k = key_set cmp2 x` >>
+ fs []
+ >- (Cases_on `?x'. x = f x'` >>
+     fs [] 
+     >- (first_x_assum (qspecl_then [`key_set cmp1 x'`] mp_tac) >>
+         rw []
+
+ rw [] >>
+
+
+ fs [lift_key_def]
+
+ Cases_on `FLOOKUP (MAP_KEYS (IMAGE f) (to_fmap cmp1 t)) k`
+ >- (fs [ALOOKUP_NONE, MEM_MAP, LAMBDA_PROD, EXISTS_PROD] >>
+     CCONTR_TAC >>
+     fs [] >>
+     rw [] >>
+     fs [lift_key_def, resp_equiv2_def, EXTENSION, LAMBDA_PROD,EXISTS_PROD, FORALL_PROD,
+         PULL_FORALL, PULL_EXISTS]>>
+
+     fs [PULL_EXISTS, PULL_FORALL, key_set_def, EXTENSION]
+
+     first_x_assum (qspecl_then [`key_set cmp1 p_1'`, `p_2`] assume_tac) >>
+     fs [FLOOKUP_DEF, MAP_KEYS_def] >>
+     fs [EXTENSION, key_set_def] >>
+     metis_tac [cmp_thms]
+
+val key_set_map = Q.prove (
+`!cmp1 cmp2 f k.
+  resp_equiv2 cmp1 cmp2 f ⇒
+  IMAGE f (key_set cmp1 k) SUBSET key_set cmp2 (f k)`,
+ rw [key_set_def, SUBSET_DEF, resp_equiv2_def] >>
+ metis_tac []);
+
+`good_cmp cmp1 ∧ good_cmp cmp2 ∧ (!x y. cmp1 x y = Equal ⇒ x = y) /\ (!x y. cmp2 x y = Equal ⇒ x = y) ∧ (!x y. f x = f y ⇒ x = y) ⇒ resp_equiv2 cmp1 cmp2 f`
+          rw [resp_equiv2_def] >>
+          metis_tac [cmp_thms]
+
+
+val flookup_lem = Q.prove (
+`!cmp1 cmp2 m k v f.
+  (FLOOKUP m k = 
+   FLOOKUP (MAP_KEYS (BIGUNION o IMAGE (λx. key_set cmp2 (f x))) m) (BIGUNION o IMAGE (λx. key_set cmp2 (f k))))`,
+
+ rw [FLOOKUP_DEF, MAP_KEYS_def] >>
+ eq_tac >>
+ rw []
+
+
 val map_keys_thm = Q.store_thm ("map_keys_thm",
 `!cmp1 cmp2 f t.
   good_cmp cmp1 ∧
@@ -2923,19 +3150,25 @@ val map_keys_thm = Q.store_thm ("map_keys_thm",
  rw [MAP_MAP_o, combinTheory.o_DEF] >>
  rw [LAMBDA_PROD] >>
  rw [fmap_eq_flookup] >>
- `lift_key cmp1 (set (toAscList t)) = set (fmap_to_alist (to_fmap cmp1 t))`
-          by metis_tac [toAscList_thm] >>
- fs [lift_key_def] >>
- fs [GSYM LIST_TO_SET_MAP] >>
- fs [EXTENSION, MEM_MAP, LAMBDA_PROD, EXISTS_PROD, FORALL_PROD] >>
- Cases_on `FLOOKUP (MAP_KEYS (IMAGE f) (to_fmap cmp1 t)) k` >>
+ `SORTED (λ(x,y) (x',y'). cmp1 x x' = Less) (toAscList t) ∧
+  lift_key cmp1 (set (toAscList t)) = set (fmap_to_alist (to_fmap cmp1 t))`
+            by metis_tac [toAscList_thm] >>
+ pop_assum mp_tac >>
+ simp [EXTENSION, MEM_MAP, LAMBDA_PROD, EXISTS_PROD, FORALL_PROD] >>
+ `transitive (λ(x,y:'c) (x',y':'c). cmp1 x x' = Less)` by metis_tac [good_cmp_trans] >>
+ rw [in_lift_key] >>
  fs []
+
+
+ fs [lift_key_def]
+
+ Cases_on `FLOOKUP (MAP_KEYS (IMAGE f) (to_fmap cmp1 t)) k`
  >- (rw [ALOOKUP_NONE, MEM_MAP, LAMBDA_PROD, EXISTS_PROD] >>
-     fs [FLOOKUP_DEF, MAP_KEYS_def] >>
      CCONTR_TAC >>
      fs [] >>
      rw [] >>
-     fs [resp_equiv2_def] >>
+     fs [lift_key_def, resp_equiv2_def, EXTENSION, LAMBDA_PROD,EXISTS_PROD, FORALL_PROD,
+         PULL_FORALL, PULL_EXISTS]>>
 
      fs [PULL_EXISTS, PULL_FORALL, key_set_def, EXTENSION]
 
