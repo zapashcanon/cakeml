@@ -2516,6 +2516,16 @@ val pair_cmp_lem = Q.prove (
  rw [pair_cmp_def] >>
  every_case_tac);
 
+val lift_key_insert = Q.prove (
+`!cmp k v m. 
+  lift_key cmp ((k,v) INSERT m) = (key_set cmp k, v) INSERT lift_key cmp m`,
+ rw [lift_key_def]);
+
+val lift_key_set = Q.prove (
+`!x y cmp l.
+  (x,y) ∈ lift_key cmp (set l) ⇔ MEM (x,y) (MAP (\(x,y). (key_set cmp x, y)) l)`,
+ rw [lift_key_def, MEM_MAP]);
+
 val compare_thm2 = Q.prove (
 `!cmp1 cmp2 t1 t2. 
   good_cmp cmp1 ∧ 
@@ -2525,12 +2535,11 @@ val compare_thm2 = Q.prove (
   fmap_rel (\x y. cmp2 x y = Equal) (to_fmap cmp1 t1) (to_fmap cmp1 t2)
   ⇒
   compare cmp1 cmp2 t1 t2 = Equal`,
-
  rw [compare_def, fmap_rel_OPTREL_FLOOKUP, OPTREL_def, list_cmp_equal_list_rel] >>
  imp_res_tac toAscList_thm >>
- fs [lift_key_def, EXTENSION] >>
+ fs [EXTENSION] >>
  simp [] >>
- fs [PULL_EXISTS, LAMBDA_PROD, FORALL_PROD, EXISTS_PROD] >>
+ fs [lift_key_def, PULL_EXISTS, LAMBDA_PROD, FORALL_PROD, EXISTS_PROD] >>
  pop_assum (mp_tac o GSYM) >>
  pop_assum (mp_tac o GSYM) >>
  DISCH_TAC >>
@@ -2545,60 +2554,8 @@ val compare_thm2 = Q.prove (
  Q.SPEC_TAC (`toAscList t1`, `l1`) >>
  Q.SPEC_TAC (`toAscList t2`, `l2`) >>
  fs [PULL_FORALL, PULL_EXISTS] >>
- Induct_on `l1` >>
- rw [LIST_REL_CONS1]
- >- (Cases_on `l2` >>
-     fs [] >>
-     metis_tac [pair_CASES]) >>
- `transitive (λ(x,y) (x',y'). cmp1 x x' = Less)` by metis_tac [good_cmp_trans] >> 
- fs [SORTED_EQ] >>
- `l2 = [] ∨ ?k2 v2 t2. l2 = (k2,v2)::t2` by metis_tac [pair_CASES, list_CASES]
- >- (Cases_on `l1` >>
-     fs [] >>
-     metis_tac [pair_CASES]) >>
- fs [SORTED_EQ] >>
- REWRITE_TAC [Once (METIS_PROVE [] ``a ∧ b ⇔ (b ⇒ a) ∧ b``)] >>
- rw []
- >- (`?k1 v1. h = (k1,v1)` by metis_tac [pair_CASES] >>
-     rw [] >>
-     last_x_assum (qspecl_then [`key_set cmp1 k1`] mp_tac) >>
-     rw [key_set_eq, pair_cmp_lem] >>
-     res_tac >>
-     fs []
-     >- metis_tac [cmp_thms]
-     >- metis_tac [cmp_thms] >>
-     fs [LIST_REL_EL_EQN, MEM_EL] >>
-     first_x_assum (qspecl_then [`n`] mp_tac) >>
-     rw [] >>
-     Cases_on `EL n l1` >>
-     Cases_on `EL n t2` >>
-     fs [pair_cmp_lem] >>
-     rw [] >>
-     res_tac >>
-     rfs [] >>
-     metis_tac [cmp_thms])
- >- (`?k1 v1. h = (k1,v1)` by metis_tac [pair_CASES] >>
-     rw [] >>
-     fs [AND_IMP_INTRO] >>
-     first_x_assum match_mp_tac >>
-     rw [] >>
-     first_assum (qspecl_then [`k`] mp_tac) >>
-     DISCH_TAC >>
-     rw [] >>
-     rfs [key_set_eq] >>
-     CCONTR_TAC >>
-     fs [] >>
-     res_tac >>
-     fs [key_set_def, EXTENSION]
-     >- metis_tac []
-     >- metis_tac []
-     >- metis_tac [cmp_thms, pair_CASES]
-     >- metis_tac [cmp_thms, pair_CASES]
-     >- cheat
-     >- cheat
-     >- metis_tac [cmp_thms]
-     >- metis_tac [cmp_thms]));
-
+ rpt gen_tac >>
+ cheat);
 
 val map_thm = Q.store_thm ("map_thm",
 `!t.
