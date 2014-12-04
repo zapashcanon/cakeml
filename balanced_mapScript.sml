@@ -2673,6 +2673,107 @@ val strict_sorted_eq_el = Q.prove (
      fs [] >>
      metis_tac [cmp_thms]));
 
+val compare_lem2 = Q.prove (
+`!cmp1 cmp2 n l1 l2.
+  good_cmp cmp1 ∧
+  good_cmp cmp2 ∧
+  (∀k.
+    (∀y p_1' y' p_1''.
+       (k ≠ key_set cmp1 p_1' ∨ ¬MEM (p_1',y) l1) ∧
+       (k ≠ key_set cmp1 p_1'' ∨ ¬MEM (p_1'',y') l2)) ∨
+    ∃x y p_1' p_1''.
+      (k = key_set cmp1 p_1' ∧ MEM (p_1',x) l1) ∧
+      (k = key_set cmp1 p_1'' ∧ MEM (p_1'',y) l2) ∧ cmp2 x y = Equal) ∧
+  SORTED (λ(x,y) (x',y'). cmp1 x x' = Less) l2 ∧
+  SORTED (λ(x,y) (x',y'). cmp1 x x' = Less) l1 ∧
+  n ≤ LENGTH l1 ∧
+  n ≤ LENGTH l2 ∧
+  LIST_REL (λ(p1,p2) (p1',p2'). pair_cmp cmp1 cmp2 (p1,p2) (p1',p2') = Equal) 
+    (TAKE n l1) (TAKE n l2) ∧
+  n ≠ LENGTH l1
+  ⇒
+  n ≠ LENGTH l2 ∧
+  (λ(p1,p2) (p1',p2'). pair_cmp cmp1 cmp2 (p1,p2) (p1',p2') = Equal)
+    (EL n l1) (EL n l2)`,
+ rpt GEN_TAC >>
+ rpt DISCH_TAC >>
+ fs [] >>
+ `?kn1 vn1. EL n l1 = (kn1,vn1)` by metis_tac [pair_CASES] >>
+ simp [] >>
+ `?kn2 vn2. MEM (kn2,vn2) l2 ∧ cmp1 kn1 kn2 = Equal ∧ cmp2 vn1 vn2 = Equal`
+        by (first_assum (qspecl_then [`key_set cmp1 kn1`] assume_tac) >>
+            `MEM (EL n l1) l1` by metis_tac [PAIR, rich_listTheory.EL_MEM, LESS_OR_EQ] >>
+            fs [] >>
+            rfs [key_set_eq]
+            >- metis_tac [PAIR, cmp_thms] >>
+            `p_1' = kn1 ∧ x = vn1` 
+                       by (match_mp_tac strict_sorted_unique >>
+                           rw [] >>
+                           metis_tac [cmp_thms]) >>
+            rw [] >>
+            metis_tac []) >>
+ fs [MEM_EL] >>
+ `n' < n ∨ n = n' ∨ n < n'` by decide_tac >>
+ fs []
+ >- (fs [LIST_REL_EL_EQN] >>
+     first_x_assum (qspecl_then [`n'`] mp_tac) >>
+     simp [rich_listTheory.EL_TAKE] >>
+     DISCH_TAC >>
+     fs [] >>
+     Cases_on `EL n' l1` >>
+     Cases_on `EL n' l2` >>
+     fs [pair_cmp_lem] >>
+     `n' < LENGTH l1 ∧ n < LENGTH l1` by decide_tac >>
+     imp_res_tac strict_sorted_eq_el >>
+     `n' = n` by metis_tac [FST, PAIR, cmp_thms] >>
+     fs [])
+ >- (rw [pair_cmp_lem] >>
+     Cases_on `EL n l2` >>
+     rw [] >>
+     metis_tac [])
+ >- cheat);
+
+(*
+
+     `~(n < m)` 
+           by (CCONTR_TAC >>
+               fs [] >>
+               `n < LENGTH l2` by decide_tac >>
+               `transitive (λ(x,y) (x',y'). cmp1 x x' = Less)` by metis_tac [good_cmp_trans] >>
+               `(λ(x,y) (x',y'). cmp1 x x' = Less) (EL n l2) (EL m l2)` by metis_tac [SORTED_EL_LESS] >>
+               pop_assum mp_tac >>
+               rw [] >>
+               `?kn vn. EL n l2 = (kn,vn)` by metis_tac [pair_CASES] >>
+               rw [] >>
+               first_assum (qspecl_then [`key_set cmp1 (FST (EL n l2))`] assume_tac) >>
+               `MEM (EL n l2) l2` 
+                       by metis_tac [PAIR, rich_listTheory.EL_MEM, LESS_OR_EQ] >>
+               fs [] >-
+               metis_tac [PAIR, cmp_thms] >>
+               rfs [key_set_eq] >>
+               `y' = vn ∧ p_1''' = kn` by metis_tac [strict_sorted_unique, PAIR] >>
+               rw [] >>
+               CCONTR_TAC >>
+               fs [MEM_EL] >>
+               rw [] >>
+               `n < LENGTH l1 ∧ n'' < LENGTH l1` by decide_tac >>
+               first_assum (qspecl_then [`key_set cmp1 p_1'`] assume_tac) >>
+               fs [] >-
+               metis_tac [PAIR, cmp_thms] >>
+               rfs [key_set_eq] >>
+               `p_1''' = p_1'` by metis_tac [rich_listTheory.EL_MEM, strict_sorted_unique, PAIR] >>
+               rw []
+
+               cheat) >>
+     `n = m` by decide_tac >>
+     rw [pair_cmp_lem] >>
+     Cases_on `EL m l1` >>
+     Cases_on `EL m l2` >>
+     rw [] >>
+     fs [] >>
+     metis_tac [cmp_thms])
+     *)
+
 val compare_thm2 = Q.prove (
 `!cmp1 cmp2 t1 t2. 
   good_cmp cmp1 ∧ 
@@ -2682,7 +2783,6 @@ val compare_thm2 = Q.prove (
   fmap_rel (\x y. cmp2 x y = Equal) (to_fmap cmp1 t1) (to_fmap cmp1 t2)
   ⇒
   compare cmp1 cmp2 t1 t2 = Equal`,
-
  rw [compare_def, fmap_rel_OPTREL_FLOOKUP, OPTREL_def, list_cmp_equal_list_rel] >>
  imp_res_tac toAscList_thm >>
  fs [EXTENSION] >>
@@ -2707,94 +2807,25 @@ val compare_thm2 = Q.prove (
  gen_tac >>
  DISCH_TAC >>
  fs []
-
- >- (first_assum (qspecl_then [`key_set cmp1 (FST (EL n l1))`] assume_tac) >>
-     `MEM (EL n l1) l1` 
-             by metis_tac [PAIR, rich_listTheory.EL_MEM, LESS_OR_EQ] >>
-     fs [] >-
-     metis_tac [PAIR, cmp_thms] >>
-     rfs [key_set_eq] >>
-     `?m. m < LENGTH l2 ∧ EL m l2 = (p_1'',y)` by metis_tac [MEM_EL] >>
-     `x = SND (EL n l1) ∧ p_1' = FST (EL n l1)` 
-             by metis_tac [strict_sorted_unique, PAIR] >>
+ >- (match_mp_tac compare_lem2 >>
+     rw [])
+ >- (`n ≠ LENGTH l1 ∧ (λ(p1,p2) (p1',p2'). pair_cmp cmp1 cmp2 (p1,p2) (p1',p2') = Equal) (EL n l2) (EL n l1)`
+            by (match_mp_tac compare_lem2 >>
+                rw []
+                >- (first_x_assum (qspecl_then [`k`] mp_tac) >>
+                    rw [] >>
+                    metis_tac [good_cmp_def])
+                >- (match_mp_tac (SIMP_RULE (srw_ss()) [AND_IMP_INTRO, PULL_FORALL] (GEN_ALL EVERY2_sym)) >>
+                    qexists_tac `(λ(p1,p2) (p1',p2'). pair_cmp cmp1 cmp2 (p1,p2) (p1',p2') = Equal)` >>
+                    rw [] >>
+                    PairCases_on `y'` >>
+                    PairCases_on `x'` >>
+                    fs [] >>
+                    metis_tac [good_cmp_def, pair_cmp_good])) >>
+     Cases_on `EL n l1` >>
+     Cases_on `EL n l2` >>
      fs [] >>
-     `~(m < n)` 
-           by (CCONTR_TAC >>
-               fs [] >>
-               fs [LIST_REL_EL_EQN] >>
-               first_x_assum (qspecl_then [`m`] mp_tac) >>
-               rw [rich_listTheory.EL_TAKE] >>
-               CCONTR_TAC >>
-               fs [] >>
-               Cases_on `EL m l1` >>
-               fs [pair_cmp_lem] >>
-               `m < LENGTH l1 ∧ n < LENGTH l1` by decide_tac >>
-               imp_res_tac strict_sorted_eq_el >>
-               `m = n` by metis_tac [FST, PAIR, cmp_thms] >>
-               fs []) >>
-     `~(n < m)` 
-           by (CCONTR_TAC >>
-               fs [] >>
-               `n < LENGTH l2` by decide_tac >>
-               `transitive (λ(x,y) (x',y'). cmp1 x x' = Less)` by metis_tac [good_cmp_trans] >>
-               `(λ(x,y) (x',y'). cmp1 x x' = Less) (EL n l2) (EL m l2)` by metis_tac [SORTED_EL_LESS] >>
-               pop_assum mp_tac >>
-               rw [] >>
-               `?kn vn. EL n l2 = (kn,vn)` by metis_tac [pair_CASES] >>
-               rw [] >>
-               first_assum (qspecl_then [`key_set cmp1 (FST (EL n l2))`] assume_tac) >>
-               `MEM (EL n l2) l2` 
-                       by metis_tac [PAIR, rich_listTheory.EL_MEM, LESS_OR_EQ] >>
-               fs [] >-
-               metis_tac [PAIR, cmp_thms] >>
-               rfs [key_set_eq] >>
-               `y' = vn ∧ p_1''' = kn` by metis_tac [strict_sorted_unique, PAIR] >>
-               rw [] >>
-               CCONTR_TAC >>
-               fs [MEM_EL] >>
-               rw [] >>
-               `n < LENGTH l1 ∧ n'' < LENGTH l1` by decide_tac >>
-               cheat) >>
-     `n = m` by decide_tac >>
-     rw [pair_cmp_lem] >>
-     Cases_on `EL m l1` >>
-     Cases_on `EL m l2` >>
-     rw [] >>
-     fs [] >>
-     metis_tac [cmp_thms])
- >- (first_x_assum (qspecl_then [`key_set cmp1 (FST (EL n l2))`] mp_tac) >>
-     simp [key_set_eq] >>
-     DISCH_TAC >>
-     `MEM (EL n l2) l2` 
-             by metis_tac [PAIR, rich_listTheory.EL_MEM, LESS_OR_EQ] >>
-     fs [] >-
-     metis_tac [PAIR, cmp_thms] >>
-     `?m. m < LENGTH l1 ∧ (p_1',x) = EL m l1` by metis_tac [MEM_EL] >>
-     `SND (EL n l2) = y ∧ FST (EL n l2) = p_1''` 
-             by metis_tac [strict_sorted_unique, PAIR] >>
-     `~(m < n)` 
-           by (CCONTR_TAC >>
-               fs [] >>
-               fs [LIST_REL_EL_EQN] >>
-               first_x_assum (qspecl_then [`m`] mp_tac) >>
-               rw [rich_listTheory.EL_TAKE] >>
-               CCONTR_TAC >>
-               fs [] >>
-               Cases_on `EL m l2` >>
-               Cases_on `EL m l1` >>
-               fs [pair_cmp_lem] >>
-               `m < LENGTH l2 ∧ n < LENGTH l2` by decide_tac >>
-               `cmp1 (FST (EL m l2)) (FST (EL n l2)) = Equal` by metis_tac [cmp_thms, FST] >>
-               imp_res_tac strict_sorted_eq_el >>
-               decide_tac) >>
-     `~(n < m)` by cheat >>
-     `n = m` by decide_tac >>
-     rw [pair_cmp_lem] >>
-     Cases_on `EL m l1` >>
-     Cases_on `EL m l2` >>
-     rw [] >>
-     fs [] >>
-     metis_tac [cmp_thms]));
+     metis_tac [good_cmp_def, pair_cmp_good]));
 
 val compare_thm = Q.store_thm ("compare_thm",
 `!cmp1 cmp2 t1 t2. 
