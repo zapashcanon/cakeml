@@ -79,9 +79,11 @@ val good_oset_ounion = Q.store_thm ("good_oset_ounion",
  rw [good_oset_def, ounion_def] >>
  metis_tac [union_thm]);
 
+(*
 val good_oset_oimage = Q.store_thm ("good_oset_oimage",
 `!cmp f s. good_cmp cmp ⇒ good_oset cmp (oimage cmp f s)`,
  cheat);
+ *)
 
 val good_cmp_ocompare = Q.store_thm ("good_cmp_ocompare",
 `!cmp f s. good_cmp cmp ⇒ good_cmp (ocompare cmp)`,
@@ -214,9 +216,11 @@ val oin_ounion = Q.store_thm ("oin_ounion",
  `to_fmap cmp (union cmp s1 s2) = to_fmap cmp s1 ⊌ to_fmap cmp s2` by metis_tac [union_thm] >>
  rw []);
 
+(*
 val oin_oimage = Q.store_thm ("oin_oimage",
 `!cmp y s f. good_cmp cmp ⇒ (oin cmp y (oimage cmp f s) ⇔ ?x. cmp y (f x) = Equal ∧ oin cmp x s)`,
  cheat);
+ *)
 
 val osubset_thm = Q.store_thm ("osubset_thm",
 `!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (osubset cmp s1 s2 ⇔ (!x. oin cmp x s1 ⇒ oin cmp x s2))`,
