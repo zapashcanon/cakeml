@@ -230,25 +230,24 @@ val osubset_thm = Q.store_thm ("osubset_thm",
  rw []);
 
 val oextension = Q.store_thm ("oextension",
-`!cmp s1 s2. good_oset cmp s1 ∧ good_oset cmp s2 ⇒ (ocompare cmp s1 s2 = Equal ⇔ (!x. oin cmp x s1 ⇔ oin cmp x s2))`,
+`!cmp s1 s2. 
+  good_oset cmp s1 ∧ good_oset cmp s2
+  ⇒ 
+  (ocompare cmp s1 s2 = Equal ⇔ (!x. oin cmp x s1 ⇔ oin cmp x s2))`,
  rw [good_oset_def, ocompare_def] >>
  `good_cmp (\(x:unit) (y:unit). Equal)` 
             by (rw [good_cmp_def, LAMBDA_PROD, FORALL_PROD] >>
                 metis_tac [good_cmp_def]) >>
+ rw [compare_thm] >>
+ rw [oin_def, member_thm, fmap_rel_OPTREL_FLOOKUP, OPTREL_def, FLOOKUP_DEF] >>
  eq_tac >>
  rw []
- >- (`fmap_rel (\x y. (λx y:unit. Equal) x y = Equal) (to_fmap cmp s1) (to_fmap cmp s2)`
-             by (match_mp_tac compare_thm >>
-                 rw []) >>
-     fs [fmap_rel_OPTREL_FLOOKUP, OPTREL_def, oin_def] >>
-     imp_res_tac member_thm >>
-     rw [] >>
-     fs [FLOOKUP_DEF] >>
-     metis_tac [])
- >- (fs [oin_def] >>
-     imp_res_tac member_thm >>
-     fs [] >>
-     cheat));
+ >- metis_tac [] >>
+ CCONTR_TAC >>
+ fs [] >>
+ imp_res_tac to_fmap_key_set >>
+ fs [] >>
+ metis_tac []);
 
 val oevery_oin = Q.store_thm ("oevery_oin",
 `!cmp f s. 
