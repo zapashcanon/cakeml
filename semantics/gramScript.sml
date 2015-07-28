@@ -62,7 +62,7 @@ fun tokmap s =
 
 val ginfo = { tokmap = tokmap,
               tokty = ``:token``, nt_tyname = "MMLnonT",
-              start = "Type",
+              start = "REPLTop",
               gname = "cmlG", mkntname = (fn s => "n" ^ s) }
 
 val cmlG_def = mk_grammar_def ginfo
@@ -94,43 +94,19 @@ val cmlG_def = mk_grammar_def ginfo
      UQConstructorName
   | ^(``{LongidT str s | str,s | s ≠ "" ∧ isAlpha (HD s) ∧ isUpper (HD s) ∨
                                  s ∈ {"true"; "false"; "ref"; "nil"}}``);
- V ::= ^(``{AlphaT s | s ∉ {"before"; "div"; "mod"; "o"; "true"; "false"; "ref";
-                            "nil" } ∧
-                       s ≠ "" ∧ ¬isUpper (HD s)}``)
-    |  ^(``{SymbolT s |
-            s ∉ {"+"; "*"; "-"; "/"; "<"; ">"; "<="; ">="; "<>"; ":=";
-                 "::"; "@"}}``);
- FQV ::= V
-      |  ^(``{LongidT str s | str,s |
-              s ≠ "" ∧ (isAlpha (HD s) ⇒ ¬isUpper (HD s)) ∧
-              s ∉ {"true"; "false"; "ref"; "nil"}}``) ;
- OpID ::= ^(``{LongidT str s | str,s | s ≠ ""}``)
-       |  ^(``{AlphaT s | s ≠ ""}``)
-       |  ^(``{SymbolT s | s ≠ ""}``)
-       |  "*" ;
- Vlist1 ::= V Vlist1 | V;
- Ebase ::= "(" Eseq ")" | Etuple | "(" ")" | FQV | ConstructorName | <IntT>
+ OpID ::= ^(``{LongidT str s | str,s | s ≠ ""}``) | V ;
+ V ::= ^(``{AlphaT s | s ≠ ""}``) |  ^(``{SymbolT s | s ≠ ""}``) |  "*" ;
+ Ebase ::= "(" Eseq ")" | Etuple | "(" ")" | OpID | <IntT>
         |  <CharT> | <StringT> | "let" LetDecs "in" Eseq "end" | "[" "]"
         | "[" Elist1 "]" | "op" OpID ;
  Eseq ::= E ";" Eseq | E;
  Etuple ::= "(" Elist2 ")";
  Elist2 ::= E "," Elist1;
  Elist1 ::= E | E "," Elist1;
- Eapp ::= Eapp Ebase | Ebase;
 
  (* expressions - binary operators *)
- MultOps ::= ^(``{AlphaT "div"; AlphaT "mod"; StarT; SymbolT "/"}``);
- AddOps ::= ^(``{SymbolT "+"; SymbolT "-"}``);
- RelOps ::= ^(``{SymbolT s | s ∈ {"<"; ">"; "<="; ">="; "<>"}}``) | "=";
- CompOps ::= "o" | ":=";
- ListOps ::= "@" | "::";
- Emult ::= Emult MultOps Eapp | Eapp;
- Eadd ::= Eadd AddOps Emult | Emult;
- Elistop ::= Eadd ListOps Elistop | Eadd;
- Erel ::= Erel RelOps Elistop | Elistop;
- Ecomp ::= Ecomp CompOps Erel | Erel;
- Ebefore ::= Ebefore "before" Ecomp | Ecomp;
- Etyped ::= Ebefore | Ebefore ":" Type;
+ Eops ::= Ebase | Ebase Eops ;
+ Etyped ::= Eops | Eops ":" Type;
  ElogicAND ::= ElogicAND "andalso" Etyped | Etyped;
  ElogicOR ::= ElogicOR "orelse" ElogicAND | ElogicAND;
  Ehandle ::= ElogicOR | ElogicOR "handle" PEs ;
@@ -198,26 +174,5 @@ in
 end
 
 val _ = computeLib.add_persistent_funs ["nt_distinct_ths"]
-
-val ast = ``Nd (mkNT nEmult) [
-              Nd (mkNT nEmult) [
-                Nd (mkNT nEmult) [
-                  Nd (mkNT nEapp) [Nd (mkNT nEbase) [Lf (TK (IntT 3))]]
-                ];
-                Nd (mkNT nMultOps) [Lf (TK StarT)];
-                Nd (mkNT nEapp) [Nd (mkNT nEbase) [Lf (TK (IntT 4))]]
-              ];
-              Nd (mkNT nMultOps) [Lf (TK (SymbolT "/"))];
-              Nd (mkNT nEapp) [Nd (mkNT nEbase) [Lf (TK (IntT 5))]]
-            ]``
-
-val check_results =
-    time (SIMP_CONV (srw_ss())
-              [valid_ptree_def, cmlG_def,DISJ_IMP_THM, FORALL_AND_THM,
-               finite_mapTheory.FAPPLY_FUPDATE_THM])
- ``valid_ptree cmlG ^ast``
-
-val _ = if aconv (rhs (concl check_results)) T then print "valid_ptree: OK\n"
-        else raise Fail "valid_ptree: failed"
 
 val _ = export_theory()
