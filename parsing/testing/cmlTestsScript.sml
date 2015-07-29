@@ -11,19 +11,8 @@ val _ = overload_on ("NN", ``λn. Nd (mkNT n)``)
 val _ = overload_on ("Tf", ``λt. Lf (TK t)``)
 val _ = overload_on ("Tfa", ``λs. Lf (TK (AlphaT s))``)
 val _ = overload_on ("Tfs", ``λs. Lf (TK (SymbolT s))``)
-val _ = overload_on (
-  "EREL",
-  ``λl. NN nE [NN nEhandle
-                  [NN nElogicOR
-                      [NN nElogicAND
-                          [NN nEtyped [NN nEbefore [NN nEcomp l]]]]]]``)
-val _ = overload_on (
-  "EB",
-  ``λl. EREL [NN nErel [NN nElistop [NN nEadd [NN nEmult [NN nEapp [NN nEbase l]]]]]]``)
-
 val _ = overload_on ("OLDAPP", ``λt1 t2. App Opapp [t1; t2]``)
 val _ = overload_on ("", ``λt1 t2. App Opapp [t1; t2]``)
-val _ = overload_on ("SOME", ``TC_name``)
 val _ = overload_on ("vbinop", ``λopn a1 a2. App Opapp [App Opapp [Var opn; a1]; a2]``)
 
 val result_t = ``Result``
@@ -93,21 +82,30 @@ in
   else die ("NO RESULT:", r)
 end
 
+val _ = computeLib.add_persistent_funs [
+  "option.OPTION_BIND_def", "option.OPTION_GUARD_def"]
+
 fun parsetest t1 t2 s = parsetest0 t1 t2 s NONE
-fun tytest0 s r = parsetest0 ``nType`` ``ptree_Type nType`` s (SOME r)
-val tytest = parsetest ``nType`` ``ptree_Type nType``
+val ignore_state_def = Define`
+  ignore_state f p = OPTION_MAP FST (f p [empty_PCstate0])
+`;
 
-val elab_decls = ``OPTION_MAP (elab_decs NONE [] []) o ptree_Decls``
+fun tytest0 s r =
+  parsetest0 ``nType`` ``ignore_state (ptree_Type nType)`` s (SOME r)
+val tytest = parsetest ``nType`` ``ignore_state (ptree_Type nType)``
 
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "fn x => x"
+val elab_decls = ``λp. OPTION_MAP FST (ptree_Decls p [empty_PCstate0])``
+
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)``
+                   "fn x => x"
                    (SOME ``Fun "x" (Var (Short "x"))``)
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "fn (x,y) => x + y"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "fn (x,y) => x + y"
                    (SOME ``Fun "" (Mat (Var (Short ""))
                                        [(Pcon NONE [Pvar "x"; Pvar "y"],
                                          vbinop (Short "+")
                                                 (Var (Short "x"))
                                                 (Var (Short "y")))])``)
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "fun f 0 NONE = 3"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl`` "fun f 0 NONE = 3"
                    (SOME ``Dletrec
                             [("f","",
                               Mat (Var (Short ""))
@@ -117,7 +115,8 @@ val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "fun f 0 NONE = 3"
                                              [(Pcon (SOME (Short "NONE")) [],
                                                Lit (IntLit 3))]))])]``)
 
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "fun f (x,y) (SOME z) = x * y + z"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl``
+                   "fun f (x,y) (SOME z) = x * y + z"
                    (SOME
                       ``Dletrec
                          [("f","",
@@ -134,17 +133,18 @@ val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "fun f (x,y) (SOME z) = x * y + z"
                                                    (Var (Short "z")))]))])]``)
 
 
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "op*" (SOME ``Var (Short "*")``)
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "f op* 10"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "op*"
+                   (SOME ``Var (Short "*")``)
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "f op* 10"
                    (SOME ``OLDAPP (OLDAPP (Var (Short "f")) (Var (Short "*")))
                                   (Lit (IntLit 10))``)
 val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "f op+ 10"
                    (SOME ``OLDAPP (OLDAPP (Var (Short "f")) (Var (Short "+")))
                                   (Lit (IntLit 10))``)
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "op*(2,3)"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "op*(2,3)"
                    (SOME ``OLDAPP (Var (Short "*"))
                               (Con NONE [Lit (IntLit 2); Lit (IntLit 3)])``)
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "op tHEN(t1,t2)"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "op tHEN(t1,t2)"
                    (SOME ``OLDAPP (Var (Short "tHEN"))
                               (Con NONE [Var (Short "t1"); Var (Short "t2")])``)
 
@@ -153,20 +153,22 @@ val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "2 * 3"
                               (Lit (IntLit 2))
                               (Lit (IntLit 3))``)
 
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "()"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "()"
                    (SOME ``Con NONE []``)
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "SOME ()"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "SOME ()"
                    (SOME ``Con (SOME (Short "SOME")) [Con NONE []]``)
 
-val _ = parsetest0 ``nSpecLine`` ``ptree_SpecLine`` "type 'a foo = 'a list"
+val _ = parsetest0 ``nSpecLine`` ``ignore_state ptree_SpecLine``
+                   "type 'a foo = 'a list"
                    (SOME ``Stabbrev ["'a"] "foo"
                              (Tapp [Tvar "'a"] (TC_name (Short "list")))``)
 
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "type 'a foo = 'a list"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl`` "type 'a foo = 'a list"
                    (SOME ``Dtabbrev ["'a"] "foo"
                              (Tapp [Tvar "'a"] (TC_name (Short "list")))``)
 
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "val h::List.nil = [3]"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl``
+          "val h::List.nil = [3]"
           (SOME ``Dlet
                     (Pcon (SOME (Short "::"))
                               [Pvar "h";
@@ -234,30 +236,31 @@ val _ = tytest "'a * bool -> 'a"
 val _ = tytest "'a * (bool * 'c)"
 val _ = tytest "(bool * int)"
 val _ = tytest "(bool list * int) * bool"
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "exception Foo"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl`` "exception Foo"
                    (SOME ``Dexn "Foo" []``)
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "exception Bar of int"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl`` "exception Bar of int"
                    (SOME ``Dexn "Bar" [Tapp [] (TC_name (Short "int"))]``)
-val _ = parsetest0 ``nDecl`` ``ptree_Decl`` "exception Bar of int * int"
+val _ = parsetest0 ``nDecl`` ``ignore_state ptree_Decl``
+                   "exception Bar of int * int"
                    (SOME ``Dexn "Bar"
-                             [Tapp [] (SOME (Short "int"));
-                              Tapp [] (SOME (Short "int"))]``);
-val _ = parsetest ``nPType`` ``ptree_PType`` "'a"
-val _ = parsetest ``nPType`` ``ptree_PType`` "'a * bool"
-val _ = parsetest ``nPatternList`` ``ptree_Plist`` "x,y"
+                             [Tapp [] (TC_name (Short "int"));
+                              Tapp [] (TC_name (Short "int"))]``);
+val _ = parsetest ``nPType`` ``ignore_state ptree_PType`` "'a"
+val _ = parsetest ``nPType`` ``ignore_state ptree_PType`` "'a * bool"
+val _ = parsetest ``nPatternList`` ``ignore_state ptree_Plist`` "x,y"
 val _ = parsetest ``nPtuple`` ``ptree_Pattern nPtuple`` "(x,y)"
 
 val _ = parsetest ``nPattern`` ``ptree_Pattern nPattern`` "C x"
 val _ = parsetest ``nPattern`` ``ptree_Pattern nPattern`` "C(x,y)"
 val _ = parsetest ``nPattern`` ``ptree_Pattern nPattern`` "(x,3)"
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "(x,y,4)"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "(x,y,4)"
                    (SOME ``Con NONE [Var (Short "x");
                                          Var (Short "y");
                                          Lit (IntLit 4)]``);
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "C(x,3)"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "C(x,3)"
                    (SOME ``Con (SOME (Short "C"))
                                    [Var (Short "x"); Lit (IntLit 3)]``)
-val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "f(x,3)"
+val _ = parsetest0 ``nE`` ``ignore_state (ptree_Expr nE)`` "f(x,3)"
                    (SOME ``OLDAPP (Var (Short "f"))
                                    (Con NONE
                                             [Var (Short "x");
@@ -267,20 +270,20 @@ val _ = tytest "'a"
 val _ = tytest "'a -> bool"
 val _ = tytest "'a -> bool -> foo"
 val _ = tytest "('a)"
-val _ = tytest0 "('a)list" ``Tapp [Tvar "'a"] (SOME(Short "list"))``
+val _ = tytest0 "('a)list" ``Tapp [Tvar "'a"] (TC_name (Short "list"))``
 val _ = tytest "('a->bool)list"
 val _ = tytest "'a->bool list"
 val _ = tytest "('a->bool)->bool"
 val _ = tytest0 "('a,foo)bar"
-                ``Tapp [Tvar "'a"; Tapp [] (SOME(Short "foo"))]
-                           (SOME (Short "bar"))``
+                ``Tapp [Tvar "'a"; Tapp [] (TC_name(Short "foo"))]
+                           (TC_name (Short "bar"))``
 val _ = tytest "('a) list list"
 val _ = tytest "('a,'b) foo list"
 val _ = tytest "'a list"
 val _ = tytest "'a list list"
 val _ = tytest "bool list list"
 val _ = tytest "('a,bool list)++"
-val _ = parsetest0 ``nREPLTop`` ``ptree_REPLTop``
+val _ = parsetest0 ``nREPLTop`` ``ignore_state ptree_REPLTop``
           "case g of C p1 => e1 | p2 => e2;"
           (SOME ``Tdec
                      (Dlet
@@ -290,12 +293,12 @@ val _ = parsetest0 ``nREPLTop`` ``ptree_REPLTop``
                                    Var (Short "e1"));
                                   (Pvar "p2", Var (Short "e2"))]))``)
 
-val _ = parsetest0 ``nREPLTop`` ``ptree_REPLTop``
+val _ = parsetest0 ``nREPLTop`` ``ignore_state ptree_REPLTop``
                    "structure s :> sig type 'a t type ('b,'c) u val z : 'a t end = struct end;"
       (SOME ``Tmod "s"
           (SOME [Stype_opq ["'a"] "t";
                  Stype_opq ["'b"; "'c"] "u";
-                 Sval "z" (Tapp [Tvar "'a"] (SOME (Short "t")))])
+                 Sval "z" (Tapp [Tvar "'a"] (TC_name (Short "t")))])
           []``)
 
 val _ = parsetest0 ``nE`` ``ptree_Expr nE`` "4 handle IntError x => 3 + 4"

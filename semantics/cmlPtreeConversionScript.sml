@@ -465,6 +465,52 @@ val mkPatApp_def = Define`
         | _ => Pcon (SOME cn) [p]
 `;
 
+val isSymbolicConstructor_def = Define`
+  isSymbolicConstructor (structopt : modN option) s =
+    return (s = "::")
+`;
+
+val isConstructor_def = Define`
+  isConstructor structopt s =
+    do
+      ifM (isSymbolicConstructor structopt s)
+        (return T)
+        (return (case oHD s of
+                     NONE => F
+                   | SOME c => isAlpha c ∧ isUpper c))
+    od
+`;
+
+val mkID_def = Define`
+  (mkID NONE s = Short s) ∧
+  (mkID (SOME str) s = Long str s)
+`;
+
+val ptree_OpID_def = Define`
+  ptree_OpID _ _ (Lf _) = fail ∧
+  ptree_OpID cf vf (Nd nt subs) =
+    if nt ≠ mkNT nOpID then fail
+    else
+      case subs of
+          [Lf (TK tk)] =>
+          do
+              (stropt,s) <- opt (OPTION_MAP (SOME ## I) (destLongidT tk)) ++
+                            (if tk = StarT then return (NONE, "*") else fail);
+              ifM (isConstructor stropt s)
+                  (return (cf (SOME (mkID stropt s)) []))
+                  (vf (mkID stropt s))
+          od
+       | [Lf _] => fail
+       | [pt] =>
+         do
+           s <- ptree_V pt ;
+           ifM (isConstructor NONE s)
+               (return (cf (SOME (Short s)) []))
+               (vf (Short s))
+         od
+       | _ => fail
+`;
+
 val ptree_Pattern_def = Define`
   (ptree_Pattern nt (Lf _) = fail) ∧
   (ptree_Pattern nt (Nd nm args) =
@@ -473,11 +519,10 @@ val ptree_Pattern_def = Define`
       case args of
           [vic] =>
           ptree_Pattern nPtuple vic ++
-          do
-             cname <- ptree_ConstructorName vic;
-             return (Pcon (SOME cname) [])
-          od ++
-          do vname <- ptree_V vic; return (Pvar vname) od ++
+          ptree_OpID
+            Pcon
+            (λv. case v of Short s => return (Pvar s) | _ => fail)
+            vic ++
           do
             lf <- optf destLf vic;
             t <- optf destTOK lf;
@@ -596,46 +641,6 @@ val mkAst_App_def = Define`
      | _ => App Opapp [a1; a2]
 `
 
-val isSymbolicConstructor_def = Define`
-  isSymbolicConstructor (structopt : modN option) s =
-    return (s = "::")
-`;
-
-val isConstructor_def = Define`
-  isConstructor structopt s =
-    do
-      ifM (isSymbolicConstructor structopt s)
-        (return T)
-        (return (case oHD s of
-                     NONE => F
-                   | SOME c => isAlpha c ∧ isUpper c))
-    od
-`;
-
-val ptree_OpID_def = Define`
-  ptree_OpID (Lf _) = fail ∧
-  ptree_OpID (Nd nt subs) =
-    if nt ≠ mkNT nOpID then fail
-    else
-      case subs of
-          [Lf (TK tk)] =>
-          do
-              (str,s) <- optf destLongidT tk ;
-              ifM (isConstructor (SOME str) s)
-                  (return (Con (SOME (Long str s)) []))
-                  (return (Var (Long str s)))
-          od
-       | [Lf _] => fail
-       | [pt] =>
-         do
-           s <- ptree_V pt ;
-           ifM (isConstructor NONE s)
-               (return (Con (SOME (Short s)) []))
-               (return (Var (Short s)))
-         od
-       | _ => fail
-`;
-
 val dePat_def = Define`
   (dePat (Pvar v) b = (v, b)) ∧
   (dePat p b = ("", Mat (Var (Short "")) [(p, b)]))
@@ -672,14 +677,14 @@ val ptree_Expr_def = Define`
                  do c <- optf destCharT t ; return (Lit (Char c)) od ++
                  do s <- optf destStringT t ; return (Lit (StrLit s)) od)
               od ++
-              ptree_OpID single ++
+              ptree_OpID Con (return o Var) single ++
               ptree_Expr nEtuple single
           | [lp;rp] => if lp = Lf (TK LparT) ∧ rp = Lf (TK RparT) then
                          return (Con NONE [])
                        else if lp = Lf (TK LbrackT) ∧ rp = Lf (TK RbrackT) then
                          return (Con (SOME (Short "nil")) [])
                        else if lp = Lf (TK OpT) then
-                         ptree_OpID rp
+                         ptree_OpID Con (return o Var) rp
                        else
                          fail
           | [lett;letdecs_pt;intok;ept;endt] =>

@@ -50,17 +50,9 @@ val NT_rank_def = Define`
         else if n = nElogicOR          then 13
         else if n = nElogicAND         then 12
         else if n = nEtyped            then 11
-        else if n = nEbefore           then 10
-        else if n = nEcomp             then  9
-        else if n = nErel              then  8
-        else if n = nElistop           then  7
-        else if n = nEadd              then  6
-        else if n = nEmult             then  5
-        else if n = nEapp              then  4
+        else if n = nEops              then  4
         else if n = nEbase             then  3
-        else if n = nFQV               then  2
         else if n = nV                 then  1
-        else if n = nVlist1            then  2
         else if n = nDtypeCons         then  3
         else if n = nDconstructor      then  2
         else if n = nConstructorName   then  2
@@ -237,11 +229,11 @@ end
 
 val nullacc =
     foldl fold_nullprove [] [``nE``, ``nType``, ``nTyvarN``, ``nSpecLine``,
-                             ``nVlist1``, ``nPtuple``, ``nPbase``, ``nLetDec``,
+                             ``nPtuple``, ``nPbase``, ``nLetDec``,
                              ``nTyVarList``, ``nDtypeDecl``, ``nDecl``, ``nE'``,
-                             ``nElist1``, ``nCompOps``, ``nListOps``,
-                             ``nPapp``, ``nPattern``, ``nRelOps``, ``nMultOps``,
-                             ``nAddOps``, ``nDconstructor``, ``nFDecl``,
+                             ``nElist1``,
+                             ``nPapp``, ``nPattern``,
+                             ``nDconstructor``, ``nFDecl``,
                              ``nPatternList``, ``nPbaseList1``,
                              ``nEseq``, ``nEtuple``, ``nTopLevelDecs``, ``nTopLevelDec``]
 
