@@ -4,6 +4,8 @@ open gramTheory tokenUtilsTheory astTheory
 
 open monadsyntax lcsymtacs
 
+open errorStateMonadTheory
+
 val _ = new_theory "cmlPtreeConversion"
 
 (* ----------------------------------------------------------------------
@@ -95,22 +97,32 @@ val mpop_namedscope_def = Define`
     We'll be using the option monad quite a bit in what follows
    ---------------------------------------------------------------------- *)
 
-val _ = overload_on ("monad_bind", ``OPTION_BIND``)
-val _ = overload_on ("monad_unitbind", ``OPTION_IGNORE_BIND``)
-val _ = temp_overload_on ("return", ``SOME``)
+val _ = overload_on ("monad_bind", ``errorStateMonad$BIND``)
+val _ = overload_on ("monad_unitbind", ``errorStateMonad$IGNORE_BIND``)
+val _ = temp_overload_on ("return", ``errorStateMonad$UNIT``)
 
-val _ = computeLib.add_persistent_funs ["option.OPTION_BIND_def",
-                                        "option.OPTION_IGNORE_BIND_def",
-                                        "option.OPTION_GUARD_def",
-                                        "option.OPTION_MAP_DEF",
-                                        "option.OPTION_MAP2_DEF",
-                                        "option.OPTION_CHOICE_def"]
-
-val _ = overload_on ("assert", ``option$OPTION_GUARD : bool -> unit option``)
-val _ = overload_on ("++", ``option$OPTION_CHOICE``)
-val _ = overload_on ("lift", ``option$OPTION_MAP``)
+val _ = overload_on ("assert", ``errorStateMonad$ES_GUARD``)
+val _ = overload_on ("++", ``errorStateMonad$ES_CHOICE``)
+val _ = overload_on ("lift", ``errorStateMonad$MMAP``)
+val _ = overload_on ("lift2", ``errorStateMonad$ES_LIFT2``)
+val _ = overload_on ("fail", ``errorStateMonad$ES_FAIL``)
 
 val oHD_def = Define`oHD l = case l of [] => NONE | h::_ => SOME h`
+val ESHD_def = Define`(ESHD [] = fail) ∧ (ESHD (h::t) = return h)`;
+val _ = overload_on ("mHD", ``ESHD``)
+
+val ES_LIFT_OPTF_def = Define`
+  ES_LIFT_OPTF (f:'a -> 'b option) (x:'a) =
+    case f x of NONE => fail | SOME x => return x
+`
+val _ = overload_on ("optf", ``ES_LIFT_OPTF``)
+
+val ES_LIFT_OPT_def = Define`
+  ES_LIFT_OPT NONE = fail ∧
+  ES_LIFT_OPT (SOME x) = return x
+`;
+val _ = overload_on ("opt", ``ES_LIFT_OPT``)
+
 val safeTL_def = Define`safeTL [] = [] ∧ safeTL (h::t) = t`
 
 val ifM_def = Define`
@@ -128,68 +140,66 @@ val mk_binop_def = Define`
 `
 
 val ptree_UQTyop_def = Define`
-  ptree_UQTyop (Lf _) = NONE ∧
+  ptree_UQTyop (Lf _) = fail ∧
   ptree_UQTyop (Nd nt args) =
-    if nt <> mkNT nUQTyOp then NONE
+    if nt <> mkNT nUQTyOp then fail
     else
       case args of
           [pt] =>
           do
-            lf <- destLf pt;
-            tk <- destTOK lf;
-            destSymbolT tk ++ destAlphaT tk
+            lf <- optf destLf pt;
+            tk <- optf destTOK lf;
+            optf destSymbolT tk ++ optf destAlphaT tk
           od
-        | _ => NONE
+        | _ => fail
 `;
 
 val ptree_TyvarN_def = Define`
-  ptree_TyvarN (Lf _) = NONE ∧
+  ptree_TyvarN (Lf _) = fail ∧
   ptree_TyvarN (Nd nt args) =
-    if nt <> mkNT nTyvarN then NONE
+    if nt <> mkNT nTyvarN then fail
     else
       case args of
-          [tyv] => destTyvarPT tyv
-        | _ => NONE
+          [tyv] => optf destTyvarPT tyv
+        | _ => fail
 `;
 
 val _ = temp_overload_on ("'", ``λf a. OPTION_BIND a f``);
 
 val ptree_Tyop_def = Define`
-  ptree_Tyop (Lf _) = NONE ∧
+  ptree_Tyop (Lf _) : tvarN id M = fail ∧
   ptree_Tyop (Nd nt args) =
-    if nt <> mkNT nTyOp then NONE
+    if nt <> mkNT nTyOp then fail
     else
       case args of
           [pt] =>
           do
-            (str,s) <- destLongidT ' (destTOK ' (destLf pt));
-            SOME(Long str s)
+            (str,s) <- opt (destLongidT ' (destTOK ' (destLf pt)));
+            return (Long str s)
           od ++
           do
             nm <- ptree_UQTyop pt;
-            SOME(Short nm)
+            return (Short nm)
           od
-        | _ => NONE
+        | _ => fail
 `;
-
-
 
 val ptree_linfix_def = Define`
   ptree_linfix topnt opn elnt (pt : mlptree) =
     case pt of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt args =>
         if nt = mkNT topnt then
           case args of
-              [pt] => do e <- elnt pt; SOME [e] od
+              [pt] => do e <- elnt pt; return [e] od
             | [top; op_pt; pt] => do
                 assert(op_pt = Lf (TK opn));
                 front <- ptree_linfix topnt opn elnt top;
                 last <- elnt pt;
-                SOME(front ++ [last])
+                return(front ++ [last])
               od
-            | _ => NONE
-        else NONE
+            | _ => fail
+        else fail
 `
 
 val tuplify_def = Define`
@@ -199,39 +209,39 @@ val tuplify_def = Define`
 `
 
 val ptree_Type_def = Define`
-  (ptree_Type nt (Lf _) : t option = NONE) ∧
+  (ptree_Type nt (Lf _) : t M = fail) ∧
   (ptree_Type nm (Nd nt args) =
-     if nt <> mkNT nm then NONE
+     if nt <> mkNT nm then fail
      else if nm = nType then
        case args of
           [dt] =>
           do
             tys <- ptree_PType dt;
-            tuplify tys
+            optf tuplify tys
           od
         | [dt;arrowt;rt] =>
               do
                 assert(arrowt = Lf (TOK ArrowT));
                 dtys <- ptree_PType dt;
-                dty <- tuplify dtys;
+                dty <- optf tuplify dtys;
                 rty <- ptree_Type nType rt;
-                SOME(Tfn dty rty)
+                return (Tfn dty rty)
               od
-            | _ => NONE
+            | _ => fail
      else if nm = nDType then
        case args of
            [pt] => ptree_Type nTbase pt
          | [dt; opn] => do
                           dty <- ptree_Type nDType dt;
                           opname <- ptree_Tyop opn;
-                          SOME(Tapp [dty] (TC_name opname))
+                          return (Tapp [dty] (TC_name opname))
                         od
-         | _ => NONE
+         | _ => fail
      else if nm = nTbase then
        case args of
            [pt] =>
-                OPTION_MAP Tvar (destTyvarPT pt) ++
-                OPTION_MAP (Tapp [] o TC_name) (ptree_Tyop pt)
+                lift Tvar (optf destTyvarPT pt) ++
+                lift (Tapp [] o TC_name) (ptree_Tyop pt)
          | [lpart; t; rpart] =>
               do
                 assert(lpart = Lf (TK LparT) ∧ rpart = Lf (TK RparT));
@@ -242,15 +252,15 @@ val ptree_Type_def = Define`
               assert(lpart = Lf (TK LparT) ∧ rpart = Lf (TK RparT));
               tylist <- ptree_Typelist2 tl;
               opname <- ptree_Tyop opn;
-              SOME(Tapp tylist (TC_name opname))
+              return (Tapp tylist (TC_name opname))
            od
-         | _ => NONE
-     else NONE) ∧
-  (ptree_Typelist2 ptree : t list option =
+         | _ => fail
+     else fail) ∧
+  (ptree_Typelist2 ptree : t list M =
      case ptree of
-       Lf _ => NONE
+       Lf _ => fail
      | Nd nt args =>
-       if nt <> mkNT nTypeList2 then NONE
+       if nt <> mkNT nTypeList2 then fail
        else
          case args of
            | [dt; commat; tl'] =>
@@ -258,102 +268,102 @@ val ptree_Type_def = Define`
                assert(commat = Lf (TK CommaT));
                ty <- ptree_Type nType dt;
                tylist <- ptree_TypeList1 tl';
-               SOME(ty::tylist)
+               return (ty::tylist)
              od
-           | _ => NONE) ∧
-  (ptree_TypeList1 ptree : t list option =
+           | _ => fail) ∧
+  (ptree_TypeList1 ptree : t list M =
     case ptree of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt args =>
-        if nt <> mkNT nTypeList1 then NONE
+        if nt <> mkNT nTypeList1 then fail
         else
           case args of
               [dt] =>
               do
                 ty <- ptree_Type nType dt;
-                SOME([ty])
+                return [ty]
               od
             | [dt; commat; tl] =>
               do
                 assert(commat = Lf (TK CommaT));
                 ty <- ptree_Type nType dt;
                 tl <- ptree_TypeList1 tl;
-                SOME(ty::tl)
+                return (ty::tl)
               od
-            | _ => NONE) ∧
-  (ptree_PType ptree : t list option =
+            | _ => fail) ∧
+  (ptree_PType ptree : t list M =
      case ptree of
-         Lf _ => NONE
+         Lf _ => fail
        | Nd nt args =>
-         if nt <> mkNT nPType then NONE
+         if nt <> mkNT nPType then fail
          else
            case args of
                [dty_pt] =>
                do
                  dty <- ptree_Type nDType dty_pt;
-                 SOME [dty]
+                 return [dty]
                od
              | [dty_pt; st; pty_pt] =>
                do
                  assert (st = Lf (TK StarT));
                  dty <- ptree_Type nDType dty_pt;
                  ptys <- ptree_PType pty_pt;
-                 SOME(dty::ptys)
+                 return (dty::ptys)
                od
-             | _ => NONE)
+             | _ => fail)
 `;
 
 val ptree_TypeName_def = Define`
-  ptree_TypeName ptree : (tvarN list # typeN) option =
+  ptree_TypeName ptree : (tvarN list # typeN) M =
     case ptree of
-      Lf _ => NONE
+      Lf _ => fail
     | Nd nt args =>
       if nt = mkNT nTypeName then
         case args of
-          [opt] => do opn <- ptree_UQTyop opt ; SOME([], opn) od
-        | [sym; opt] => do tyvn <- destTyvarPT sym ;
-                           opn <- ptree_UQTyop opt ;
-                           SOME ([tyvn], opn)
-                        od
-        | [lp; tyvl; rp; opt] =>
+          [oppt] => do opn <- ptree_UQTyop oppt ; return ([], opn) od
+        | [sym; oppt] => do tyvn <- optf destTyvarPT sym ;
+                            opn <- ptree_UQTyop oppt ;
+                            return ([tyvn], opn)
+                         od
+        | [lp; tyvl; rp; oppt] =>
           if lp = Lf (TK LparT) ∧ rp = Lf (TK RparT) then do
               tyvnms <- ptree_linfix nTyVarList CommaT ptree_TyvarN tyvl;
-              opn <- ptree_UQTyop opt;
-              SOME(tyvnms, opn)
+              opn <- ptree_UQTyop oppt;
+              return (tyvnms, opn)
             od
-          else NONE
-        | _ => NONE
-      else NONE
+          else fail
+        | _ => fail
+      else fail
 `;
 
 val ptree_UQConstructorName_def = Define`
-  ptree_UQConstructorName (Lf _) = NONE ∧
+  ptree_UQConstructorName (Lf _) = fail ∧
   ptree_UQConstructorName (Nd nm args) =
-    if nm <> mkNT nUQConstructorName then NONE
+    if nm <> mkNT nUQConstructorName then fail
     else
       case args of
-          [pt] => destAlphaT ' (destTOK ' (destLf pt))
-        | _ => NONE
+          [pt] => opt (destAlphaT ' (destTOK ' (destLf pt)))
+        | _ => fail
 `
 
 val ptree_ConstructorName_def = Define`
   ptree_ConstructorName ast =
     case ast of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt args =>
-        if nt <> mkNT nConstructorName then NONE
+        if nt <> mkNT nConstructorName then fail
         else
           case args of
               [pt] =>
               do
                 s <- ptree_UQConstructorName pt;
-                SOME (Short s)
+                return (Short s)
               od ++
               do
-                (str,s) <- destLongidT ' (destTOK ' (destLf pt));
-                SOME (Long str s)
+                (str,s) <- opt (destLongidT ' (destTOK ' (destLf pt)));
+                return (Long str s)
               od
-            | _ => NONE
+            | _ => fail
 `
 
 val detuplify_def = Define`
@@ -364,31 +374,31 @@ val detuplify_def = Define`
 val ptree_Dconstructor_def = Define`
   ptree_Dconstructor ast =
     case ast of
-        Lf x => NONE
+        Lf x => fail
       | Nd nt args =>
         if nt = mkNT nDconstructor then
           case args of
-              [] => NONE
+              [] => fail
             | t::ts =>
               do
                  cname <- ptree_UQConstructorName t;
                  types <- case ts of
-                               [] => SOME []
+                               [] => return []
                              | [oft; ty_pt] =>
                                if oft = Lf (TK OfT) then
-                                 OPTION_MAP detuplify (ptree_Type nType ty_pt)
-                               else NONE
-                             | _ => NONE;
-                 SOME(cname, types)
+                                 lift detuplify (ptree_Type nType ty_pt)
+                               else fail
+                             | _ => fail;
+                 return (cname, types)
               od
-            | _ :: t => NONE
-        else NONE
+            | _ :: t => fail
+        else fail
 `;
 
 val ptree_DtypeDecl_def = Define`
   ptree_DtypeDecl (pt : mlptree) =
     case pt of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt args =>
         if nt = mkNT nDtypeDecl then
           case args of
@@ -396,16 +406,16 @@ val ptree_DtypeDecl_def = Define`
                 assert(eqt = Lf (TK EqualsT));
                 tynm <- ptree_TypeName tynm_pt;
                 dtc <- ptree_linfix nDtypeCons BarT ptree_Dconstructor dtc_pt;
-                SOME(FST tynm,SND tynm,dtc)
+                return (FST tynm,SND tynm,dtc)
               od
-            | _ => NONE
-        else NONE
+            | _ => fail
+        else fail
 `;
 
 val ptree_TypeDec_def = Define`
-  ptree_TypeDec ptree : type_def option =
+  ptree_TypeDec ptree : type_def M =
     case ptree of
-      Lf _ => NONE
+      Lf _ => fail
     | Nd nt args =>
       if nt = mkNT nTypeDec then
         case args of
@@ -413,13 +423,13 @@ val ptree_TypeDec_def = Define`
               assert(datatype_pt = Lf (TK DatatypeT));
               ptree_linfix nDtypeDecls AndT ptree_DtypeDecl pt
             od
-          | _ => NONE
-      else NONE`;
+          | _ => fail
+      else fail`;
 
 val ptree_TypeAbbrevDec_def = Define`
-  ptree_TypeAbbrevDec ptree : dec option =
+  ptree_TypeAbbrevDec ptree : dec M =
     case ptree of
-      Lf _ => NONE
+      Lf _ => fail
     | Nd nt args =>
       if nt = mkNT nTypeAbbrevDec then
         case args of
@@ -427,87 +437,22 @@ val ptree_TypeAbbrevDec_def = Define`
             assert(typetok = Lf (TK TypeT) ∧ eqtok = Lf (TK EqualsT)) ;
             (vars, nm) <- ptree_TypeName tynm;
             typ <- ptree_Type nType typ_pt;
-            SOME(Dtabbrev vars nm typ)
+            return (Dtabbrev vars nm typ)
           od
-        | _ => NONE
-      else NONE
+        | _ => fail
+      else fail
 `
 
-val ptree_Op_def = Define`
-  ptree_Op (Lf _) = NONE ∧
-  ptree_Op (Nd nt subs) =
-    if nt = mkNT nMultOps then
-      if subs = [Lf (TK StarT)] then SOME (Short "*")
-      else if subs = [Lf (TK (SymbolT "/"))] then SOME (Short "/")
-      else if subs = [Lf (TK (AlphaT "mod"))] then SOME (Short "mod")
-      else if subs = [Lf (TK (AlphaT "div"))] then SOME (Short "div")
-      else NONE
-    else if nt = mkNT nAddOps then
-      if subs = [Lf (TK (SymbolT "+"))] then SOME (Short "+")
-      else if subs = [Lf (TK (SymbolT "-"))] then SOME (Short "-")
-      else NONE
-    else if nt = mkNT nListOps then
-      if subs = [Lf (TK (SymbolT "::"))] then SOME (Short "::")
-      else if subs = [Lf (TK (SymbolT "@"))] then SOME (Short "@")
-      else NONE
-    else if nt = mkNT nRelOps then
-      case subs of
-          [pt] =>
-          do
-            s <- destSymbolT ' (destTOK ' (destLf pt));
-            SOME (Short s)
-          od ++
-          do
-            assert(pt = Lf (TK EqualsT));
-            SOME(Short "=")
-          od
-        | _ => NONE
-    else if nt = mkNT nCompOps then
-      if subs = [Lf (TK (SymbolT ":="))] then SOME (Short ":=")
-      else if subs = [Lf (TK (AlphaT "o"))] then SOME (Short "o")
-      else NONE
-    else NONE
-`;
-
 val ptree_V_def = Define`
-  ptree_V (Lf _) = NONE ∧
+  ptree_V (Lf _) = fail ∧
   ptree_V (Nd nt subs) =
     if nt = mkNT nV then
       case subs of
-          [Lf (TOK t)] => destAlphaT t ++ destSymbolT t
-        | _ => NONE
-    else NONE
+          [Lf (TOK t)] => optf destAlphaT t ++ optf destSymbolT t ++
+                          do assert (t = StarT) ; return "*" od
+        | _ => fail
+    else fail
 `;
-
-val ptree_Vlist1_def = Define`
-  ptree_Vlist1 (Lf _) = NONE ∧
-  ptree_Vlist1 (Nd nm subs) =
-    if nm <> mkNT nVlist1 then NONE
-    else
-      case subs of
-          [v_pt] => do v <- ptree_V v_pt; SOME [v] od
-        | [v_pt; vs_pt] =>
-          do
-            v <- ptree_V v_pt;
-            vs <- ptree_Vlist1 vs_pt;
-            SOME(v::vs)
-          od
-        | _ => NONE
-`
-
-val ptree_FQV_def = Define`
-  ptree_FQV (Lf _) = NONE ∧
-  ptree_FQV (Nd nt args) =
-    if nt <> mkNT nFQV then NONE
-    else
-      case args of
-          [pt] => OPTION_MAP Short (ptree_V pt) ++
-                  do
-                    (str,s) <- destLongidT ' (destTOK ' (destLf pt));
-                    SOME(Long str s)
-                  od
-        | _ => NONE
-`
 
 (* in other words constructors never take tuples as arguments, only ever
    lists of arguments *)
@@ -521,39 +466,39 @@ val mkPatApp_def = Define`
 `;
 
 val ptree_Pattern_def = Define`
-  (ptree_Pattern nt (Lf _) = NONE) ∧
+  (ptree_Pattern nt (Lf _) = fail) ∧
   (ptree_Pattern nt (Nd nm args) =
-    if mkNT nt <> nm then NONE
+    if mkNT nt <> nm then fail
     else if nm = mkNT nPbase then
       case args of
           [vic] =>
           ptree_Pattern nPtuple vic ++
           do
              cname <- ptree_ConstructorName vic;
-             SOME(Pcon (SOME cname) [])
+             return (Pcon (SOME cname) [])
           od ++
-          do vname <- ptree_V vic; SOME(Pvar vname) od ++
+          do vname <- ptree_V vic; return (Pvar vname) od ++
           do
-            lf <- destLf vic;
-            t <- destTOK lf;
-            (do i <- destIntT t ; return (Plit (IntLit i)) od ++
-             do s <- destStringT t ; return (Plit (StrLit s)) od ++
-             do c <- destCharT t ; return (Plit (Char c)) od)
+            lf <- optf destLf vic;
+            t <- optf destTOK lf;
+            (do i <- optf destIntT t ; return (Plit (IntLit i)) od ++
+             do s <- optf destStringT t ; return (Plit (StrLit s)) od ++
+             do c <- optf destCharT t ; return (Plit (Char c)) od)
           od ++
           do assert(vic = Lf (TOK UnderbarT)) ; return (Pvar "_") od
         | [lb; rb] =>
           if lb = Lf (TK LbrackT) ∧ rb = Lf (TK RbrackT) then
-            SOME(Pcon (SOME (Short "nil")) [])
-          else NONE
+            return (Pcon (SOME (Short "nil")) [])
+          else fail
         | [lb; plistpt; rb] =>
           do
             assert (lb = Lf (TK LbrackT) ∧ rb = Lf (TK RbrackT));
             plist <- ptree_Plist plistpt;
-            SOME (FOLDR (λp a. Pcon (SOME (Short "::")) [p; a])
-                        (Pcon (SOME (Short "nil")) [])
-                        plist)
+            return (FOLDR (λp a. Pcon (SOME (Short "::")) [p; a])
+                          (Pcon (SOME (Short "nil")) [])
+                          plist)
           od
-        | _ => NONE
+        | _ => fail
     else if nm = mkNT nPapp then
       case args of
           [pb] => ptree_Pattern nPbase pb
@@ -561,9 +506,9 @@ val ptree_Pattern_def = Define`
           do
             cn <- ptree_ConstructorName cnm;
             p <- ptree_Pattern nPbase ppt;
-            SOME(mkPatApp cn p)
+            return (mkPatApp cn p)
           od
-        | _ => NONE
+        | _ => fail
     else if nm = mkNT nPattern then
       case args of
           [papt] => ptree_Pattern nPapp papt
@@ -572,67 +517,67 @@ val ptree_Pattern_def = Define`
             assert (cons_t = Lf (TK (SymbolT "::")));
             pa <- ptree_Pattern nPapp papt;
             patt <- ptree_Pattern nPattern pattpt;
-            SOME(Pcon (SOME (Short "::")) [pa; patt])
+            return (Pcon (SOME (Short "::")) [pa; patt])
           od
-        | _ => NONE
+        | _ => fail
     else if nm = mkNT nPtuple then
       case args of
           [lp; rp] => if lp = Lf (TOK LparT) ∧ rp = Lf (TOK RparT) then
-                        SOME (Pcon NONE [])
-                      else NONE
+                        return (Pcon NONE [])
+                      else fail
         | [lp; pl_pt; rp] =>
           do
             assert (lp = Lf (TOK LparT) ∧ rp = Lf (TOK RparT));
             pl <- ptree_Plist pl_pt;
             case pl of
-                [] => NONE
-              | [p] => SOME p
-              | _ => SOME (Pcon NONE pl)
+                [] => fail
+              | [p] => return p
+              | _ => return (Pcon NONE pl)
           od
-        | _ => NONE
-    else NONE) ∧
+        | _ => fail
+    else fail) ∧
 
-  (ptree_Plist (Lf _) = NONE) ∧
+  (ptree_Plist (Lf _) = fail) ∧
   (ptree_Plist (Nd nm args) =
-     if nm <> mkNT nPatternList then NONE
+     if nm <> mkNT nPatternList then fail
      else
        case args of
            [p_pt] =>
            do
              p <- ptree_Pattern nPattern p_pt;
-             SOME [p]
+             return [p]
            od
          | [p; ct; pl] =>
            do
              assert (ct = Lf (TOK CommaT));
              hdpat <- ptree_Pattern nPattern p;
              tlpats <- ptree_Plist pl;
-             SOME(hdpat::tlpats)
+             return (hdpat::tlpats)
            od
-         | _ => NONE)
+         | _ => fail)
 `;
 
 val ptree_PbaseList1_def = Define`
-  (ptree_PbaseList1 (Lf _) = NONE) ∧
+  (ptree_PbaseList1 (Lf _) = fail) ∧
   (ptree_PbaseList1 (Nd nm args) =
-     if nm <> mkNT nPbaseList1 then NONE
+     if nm <> mkNT nPbaseList1 then fail
      else
        case args of
            [p_pt] => lift SINGL (ptree_Pattern nPbase p_pt)
          | [p_pt; pl_pt] =>
                lift2 CONS
                      (ptree_Pattern nPbase p_pt)
-                     (ptree_PbaseList1 pl_pt))
+                     (ptree_PbaseList1 pl_pt)
+        | _ => fail)
 `;
 
-
 val Eseq_encode_def = Define`
-  (Eseq_encode [] = NONE) ∧
-  (Eseq_encode [e] = SOME e) ∧
+  (Eseq_encode [] = fail) ∧
+  (Eseq_encode [e] = return e) ∧
   (Eseq_encode (e::es) =
    do
      body <- Eseq_encode es;
-     SOME(Let NONE e body)
+     return (Let NONE e body)
    od)
 `
 
@@ -668,36 +613,27 @@ val isConstructor_def = Define`
 `;
 
 val ptree_OpID_def = Define`
-  ptree_OpID (Lf _) = NONE ∧
+  ptree_OpID (Lf _) = fail ∧
   ptree_OpID (Nd nt subs) =
-    if nt ≠ mkNT nOpID then NONE
+    if nt ≠ mkNT nOpID then fail
     else
       case subs of
           [Lf (TK tk)] =>
           do
-              s <- destAlphaT tk ;
-              ifM (isConstructor NONE s)
-                  (return (Con (SOME (Short s)) []))
-                  (return (Var (Short s)))
-          od ++
-          do
-              s <- destSymbolT tk ;
-              ifM (isSymbolicConstructor NONE s)
-                  (return (Con (SOME (Short s)) []))
-                  (return (Var (Short s)))
-          od ++
-          do
-              (str,s) <- destLongidT tk ;
+              (str,s) <- optf destLongidT tk ;
               ifM (isConstructor (SOME str) s)
                   (return (Con (SOME (Long str s)) []))
                   (return (Var (Long str s)))
-          od ++
-          (if tk = StarT then
-             ifM (isSymbolicConstructor NONE "*")
-                 (return (Con (SOME (Short "*")) []))
-                 (return (Var (Short "*")))
-           else NONE)
-        | _ => NONE
+          od
+       | [Lf _] => fail
+       | [pt] =>
+         do
+           s <- ptree_V pt ;
+           ifM (isConstructor NONE s)
+               (return (Con (SOME (Short s)) []))
+               (return (Var (Short s)))
+         od
+       | _ => fail
 `;
 
 val dePat_def = Define`
@@ -709,9 +645,8 @@ val mkFun_def = Define`
   mkFun p b = UNCURRY Fun (dePat p b)
 `
 
-
 val ptree_Expr_def = Define`
-  ptree_Expr ent (Lf _) = NONE ∧
+  ptree_Expr ent (Lf _) = fail ∧
   ptree_Expr ent (Nd nt subs) =
     (if mkNT ent = nt then
       if nt = mkNT nEbase then
@@ -725,34 +660,28 @@ val ptree_Expr_def = Define`
             do
               assert(lpart = Lf (TK LbrackT) ∧ rpart = Lf (TK RbrackT));
               elist <- ptree_Exprlist nElist1 pt;
-              SOME(FOLDR (λe acc. Con (SOME (Short "::")) [e; acc])
-                         (Con (SOME (Short "nil")) [])
-                         elist)
+              return (FOLDR (λe acc. Con (SOME (Short "::")) [e; acc])
+                            (Con (SOME (Short "nil")) [])
+                            elist)
             od
           | [single] =>
               do
-                lf <- destLf single;
-                t <- destTOK lf;
-                (do i <- destIntT t ; SOME (Lit (IntLit i)) od ++
-                 do c <- destCharT t ; SOME (Lit (Char c)) od ++
-                 do s <- destStringT t ; SOME (Lit (StrLit s)) od)
+                lf <- optf destLf single;
+                t <- optf destTOK lf;
+                (do i <- optf destIntT t ; return (Lit (IntLit i)) od ++
+                 do c <- optf destCharT t ; return (Lit (Char c)) od ++
+                 do s <- optf destStringT t ; return (Lit (StrLit s)) od)
               od ++
-              do
-                s <- ptree_FQV single;
-                SOME (Var s)
-              od ++
-              do cname <- ptree_ConstructorName single;
-                 SOME (Con (SOME cname) [])
-              od ++
+              ptree_OpID single ++
               ptree_Expr nEtuple single
           | [lp;rp] => if lp = Lf (TK LparT) ∧ rp = Lf (TK RparT) then
-                         SOME (Con NONE [])
+                         return (Con NONE [])
                        else if lp = Lf (TK LbrackT) ∧ rp = Lf (TK RbrackT) then
-                         SOME (Con (SOME (Short "nil")) [])
+                         return (Con (SOME (Short "nil")) [])
                        else if lp = Lf (TK OpT) then
                          ptree_OpID rp
                        else
-                         NONE
+                         fail
           | [lett;letdecs_pt;intok;ept;endt] =>
             do
               assert(lett = Lf (TOK LetT) ∧ intok = Lf (TOK InT) ∧
@@ -760,121 +689,60 @@ val ptree_Expr_def = Define`
               letdecs <- ptree_LetDecs letdecs_pt;
               eseq <- ptree_Eseq ept;
               e <- Eseq_encode eseq;
-              SOME(FOLDR (λdf acc. case df of
+              return(FOLDR (λdf acc. case df of
                                        INL (v,e0) => Let (SOME v) e0 acc
                                      | INR fds => Letrec fds acc)
-                         e
-                         letdecs)
+                           e
+                           letdecs)
             od
-          | _ => NONE
-      else if nt = mkNT nEapp then
-        case subs of
-            [t1; t2] => do
-                          a1 <- ptree_Expr nEapp t1;
-                          a2 <- ptree_Expr nEbase t2;
-                          SOME(mkAst_App a1 a2)
-                        od
-          | [t] => ptree_Expr nEbase t
-          | _ => NONE
+          | _ => fail
       else if nt = mkNT nEtuple then
         case subs of
             [lpart; el2; rpart] =>
             do
               assert (lpart = Lf (TOK LparT) ∧ rpart = Lf (TOK RparT));
               es <- ptree_Exprlist nElist2 el2;
-              SOME(Con NONE es)
+              return (Con NONE es)
             od
-          | _ => NONE
-      else if nt = mkNT nEmult then
+          | _ => fail
+      else if nt = mkNT nEops then
         case subs of
-          [t1; opt; t2] => do (* s will be *, /, div, or mod *)
-            a1 <- ptree_Expr nEmult t1;
-            a_op <- ptree_Op opt;
-            a2 <- ptree_Expr nEapp t2;
-            return(mk_binop a_op a1 a2)
-          od
-        | [t] => ptree_Expr nEapp t
-        | _ => NONE
-      else if nt = mkNT nEadd then
-        case subs of
-            [t1;opt;t2] => do
-              a1 <- ptree_Expr nEadd t1;
-              a_op <- ptree_Op opt;
-              a2 <- ptree_Expr nEmult t2;
-              return (mk_binop a_op a1 a2)
-            od
-          | [t] => ptree_Expr nEmult t
-          | _ => NONE
-      else if nt = mkNT nElistop then
-        case subs of
-            [t1;opt;t2] => do
-              a1 <- ptree_Expr nEadd t1;
-              a_op <- ptree_Op opt;
-              a2 <- ptree_Expr nElistop t2;
-              return (mk_binop a_op a1 a2)
-            od
-          | [t] => ptree_Expr nEadd t
-          | _ => NONE
-      else if nt = mkNT nErel then
-        case subs of
-            [t1;opt;t2] => do
-              a1 <- ptree_Expr nErel t1;
-              a_op <- ptree_Op opt;
-              a2 <- ptree_Expr nElistop t2;
-              return (mk_binop a_op a1 a2)
-            od
-          | [t] => ptree_Expr nElistop t
-          | _ => NONE
-      else if nt = mkNT nEcomp then
-        case subs of
-            [t1;opt;t2] => do
-              a1 <- ptree_Expr nEcomp t1;
-              a_op <- ptree_Op opt;
-              a2 <- ptree_Expr nErel t2;
-              return (mk_binop a_op a1 a2)
-            od
-          | [t] => ptree_Expr nErel t
-          | _ => NONE
-      else if nt = mkNT nEbefore then
-        case subs of
-          [t1;opt;t2] => do
-            assert(opt = Lf(TOK(AlphaT "before")));
-            a1 <- ptree_Expr nEbefore t1;
-            a2 <- ptree_Expr nEcomp t2;
-            return (mk_binop (Short "before") a1 a2)
-          od
-        | [t] => ptree_Expr nEcomp t
-        | _ => NONE
+            [pt] => ptree_Expr nEbase pt
+          | [pt1; pt2] =>
+            lift2 mkAst_App
+                  (ptree_Expr nEbase pt1)
+                  (ptree_Expr nEops pt2)
+          | _ => fail
       else if nt = mkNT nEtyped then
         case subs of
           [t1;colon;t2] => do
             assert(colon = Lf (TOK ColonT));
-            t1 <- ptree_Expr nEbefore t1;
+            t1 <- ptree_Expr nEops t1;
             t2 <- ptree_Type nType t2;
-            SOME t1 (* TODO: FIXME *)
+            return t1 (* TODO: FIXME *)
           od
-        | [t] => ptree_Expr nEbefore t
-        | _ => NONE
+        | [t] => ptree_Expr nEops t
+        | _ => fail
       else if nt = mkNT nElogicAND then
         case subs of
             [t1;andt;t2] => do
               assert(andt = Lf (TOK AndalsoT));
               a1 <- ptree_Expr nElogicAND t1;
               a2 <- ptree_Expr nEtyped t2;
-              SOME(Log And a1 a2)
+              return (Log And a1 a2)
             od
           | [t] => ptree_Expr nEtyped t
-          | _ => NONE
+          | _ => fail
       else if nt = mkNT nElogicOR then
         case subs of
             [t1;ort;t2] => do
               assert(ort = Lf (TOK OrelseT));
               a1 <- ptree_Expr nElogicOR t1;
               a2 <- ptree_Expr nElogicAND t2;
-              SOME (Log Or a1 a2)
+              return (Log Or a1 a2)
             od
           | [t] => ptree_Expr nElogicAND t
-          | _ => NONE
+          | _ => fail
       else if nt = mkNT nEhandle then
         case subs of
             [pt] => ptree_Expr nElogicOR pt
@@ -883,9 +751,9 @@ val ptree_Expr_def = Define`
               assert(handlet = Lf (TOK HandleT));
               e <- ptree_Expr nElogicOR e1pt;
               pes <- ptree_PEs ent;
-              SOME(Handle e pes)
+              return (Handle e pes)
             od
-          | _ => NONE
+          | _ => fail
       else if nt = mkNT nE then
         case subs of
           | [t] => ptree_Expr nEhandle t
@@ -893,19 +761,19 @@ val ptree_Expr_def = Define`
             do
               assert(raiset = Lf (TOK RaiseT));
               e <- ptree_Expr nE ept;
-              SOME(Raise e)
+              return (Raise e)
             od
           | [fnt; pnt; arrowt; ent] =>
             do
               assert (fnt = Lf (TOK FnT) ∧ arrowt = Lf (TOK DarrowT));
               p <- ptree_Pattern nPattern pnt;
               e <- ptree_Expr nE ent;
-              SOME(mkFun p e)
+              return (mkFun p e)
             od ++ do
               assert (fnt = Lf (TOK CaseT) ∧ arrowt = Lf (TOK OfT));
               e <- ptree_Expr nE pnt;
               pes <- ptree_PEs ent;
-              SOME(Mat e pes)
+              return (Mat e pes)
             od
           | [ift;g;thent;te;elset;ee] => do
               assert(ift = Lf (TOK IfT) ∧ thent = Lf (TOK ThenT) ∧
@@ -913,9 +781,9 @@ val ptree_Expr_def = Define`
               a1 <- ptree_Expr nE g;
               a2 <- ptree_Expr nE te;
               a3 <- ptree_Expr nE ee;
-              SOME(If a1 a2 a3)
+              return (If a1 a2 a3)
             od
-          | _ => NONE
+          | _ => fail
       else if nt = mkNT nE' then
         case subs of
           | [t] => ptree_Expr nElogicOR t
@@ -923,14 +791,14 @@ val ptree_Expr_def = Define`
             do
               assert(raiset = Lf (TOK RaiseT));
               e <- ptree_Expr nE' ept;
-              SOME(Raise e)
+              return (Raise e)
             od
           | [fnt; vnt; arrowt; ent] =>
             do
               assert (fnt = Lf (TOK FnT) ∧ arrowt = Lf (TOK DarrowT));
               v <- ptree_V vnt;
               e <- ptree_Expr nE' ent;
-              SOME(Fun v e)
+              return (Fun v e)
             od
           | [ift;g;thent;te;elset;ee] => do
               assert(ift = Lf (TOK IfT) ∧ thent = Lf (TOK ThenT) ∧
@@ -938,26 +806,26 @@ val ptree_Expr_def = Define`
               a1 <- ptree_Expr nE g;
               a2 <- ptree_Expr nE te;
               a3 <- ptree_Expr nE' ee;
-              SOME(If a1 a2 a3)
+              return (If a1 a2 a3)
             od
-          | _ => NONE
-      else NONE
-    else NONE) ∧
+          | _ => fail
+      else fail
+    else fail) ∧
   (ptree_Exprlist nm ast =
      case ast of
-         Lf _ => NONE
+         Lf _ => fail
        | Nd nt subs =>
          if nt = mkNT nElist1 then
            case subs of
-               [sing] => do e <- ptree_Expr nE sing; SOME [e] od
+               [sing] => do e <- ptree_Expr nE sing; return [e] od
              | [e;ct;el1] =>
                do
                  assert(ct = Lf (TOK CommaT));
                  front <- ptree_Expr nE e;
                  back <- ptree_Exprlist nElist1 el1 ;
-                 SOME(front::back)
+                 return (front::back)
                od
-             | _ => NONE
+             | _ => fail
          else if nt = mkNT nElist2 then
            case subs of
                [e;ct;el1] =>
@@ -965,29 +833,29 @@ val ptree_Expr_def = Define`
                  assert(ct = Lf (TOK CommaT));
                  front <- ptree_Expr nE e;
                  back <- ptree_Exprlist nElist1 el1 ;
-                 SOME(front::back)
+                 return (front::back)
                od
-             | _ => NONE
-         else NONE) ∧
+             | _ => fail
+         else fail) ∧
   ptree_AndFDecls ast =
     (case ast of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt subs =>
         if nt = mkNT nAndFDecls then
           case subs of
-              [single] => do fdec <- ptree_FDecl single; SOME ([fdec]) od
+              [single] => do fdec <- ptree_FDecl single; return [fdec] od
             | [fdecspt;andt;fdecpt] =>
               do
                 assert(andt = Lf (TOK AndT));
                 fdecs <- ptree_AndFDecls fdecspt;
                 fdec <- ptree_FDecl fdecpt;
-                SOME(fdecs ++ [fdec])
+                return (fdecs ++ [fdec])
               od
-            | _ => NONE
-        else NONE) ∧
+            | _ => fail
+        else fail) ∧
   (ptree_FDecl ast =
     case ast of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt subs =>
         if nt = mkNT nFDecl then
           case subs of
@@ -996,71 +864,72 @@ val ptree_Expr_def = Define`
                 assert(eqt = Lf (TOK EqualsT));
                 fname <- ptree_V fname_pt;
                 ps <- ptree_PbaseList1 pats_pt;
-                p1 <- oHD ps;
+                p1 <- mHD ps;
                 body0 <- ptree_Expr nE body_pt;
-                SOME(fname,dePat p1 (FOLDR mkFun body0 (safeTL ps)))
+                return (fname,dePat p1 (FOLDR mkFun body0 (safeTL ps)))
               od
-            | _ => NONE
-        else NONE) ∧
+            | _ => fail
+        else fail) ∧
   (ptree_LetDecs ptree =
     case ptree of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt args =>
-        if nt <> mkNT nLetDecs then NONE
+        if nt <> mkNT nLetDecs then fail
         else
           case args of
-              [] => SOME []
+              [] => return []
             | [ld_pt; lds_pt] =>
               if ld_pt = Lf (TOK SemicolonT) then ptree_LetDecs lds_pt
               else
                 do
                   ld <- ptree_LetDec ld_pt;
                   lds <- ptree_LetDecs lds_pt;
-                  SOME (ld::lds)
+                  return (ld::lds)
                 od
-            | _ => NONE) ∧
+            | _ => fail) ∧
   (ptree_LetDec ptree =
     case ptree of
-        Lf _ => NONE
+        Lf _ => fail
       | Nd nt args =>
-        if nt <> mkNT nLetDec then NONE
+        if nt <> mkNT nLetDec then fail
         else
           case args of
               [funtok; andfdecls_pt] =>
               do
                 assert (funtok = Lf (TOK FunT));
                 fds <- ptree_AndFDecls andfdecls_pt;
-                SOME (INR fds)
+                return (INR fds)
               od
             | [valtok; v_pt; eqtok; e_pt] =>
               do
                 assert(valtok = Lf (TOK ValT) ∧ eqtok = Lf (TOK EqualsT));
                 v <- ptree_V v_pt;
                 e <- ptree_Expr nE e_pt;
-                SOME (INL(v,e))
+                return (INL(v,e))
               od
-            | _ => NONE) ∧
-  (ptree_PEs (Lf _) = NONE) ∧
+            | _ => fail) ∧
+  (ptree_PEs (Lf _) = fail) ∧
   (ptree_PEs (Nd nt args) =
-    if nt <> mkNT nPEs then NONE
+    if nt <> mkNT nPEs then fail
     else
       case args of
           [single] =>
           do
             pe <- ptree_PE single;
-            SOME [pe]
+            return [pe]
           od
         | [pe'_pt; bartok; pes_pt] =>
           do
             assert(bartok = Lf (TOK BarT));
             pes <- ptree_PEs pes_pt;
             pe <- ptree_PE' pe'_pt;
-            SOME(pe::pes)
+            return (pe::pes)
           od
-        | _ => NONE) ∧
-  (ptree_PE (Lf _) = NONE) ∧
+        | _ => fail) ∧
+
+  (ptree_PE (Lf _) = fail) ∧
   (ptree_PE (Nd nt args) =
-     if nt <> mkNT nPE then NONE
+     if nt <> mkNT nPE then fail
      else
        case args of
            [p_pt; arrow; e_pt] =>
@@ -1068,12 +937,13 @@ val ptree_Expr_def = Define`
              assert(arrow = Lf (TOK DarrowT));
              p <- ptree_Pattern nPattern p_pt;
              e <- ptree_Expr nE e_pt;
-             SOME(p,e)
+             return (p,e)
            od
-         | _ => NONE) ∧
-  (ptree_PE' (Lf _) = NONE) ∧
+         | _ => fail) ∧
+
+  (ptree_PE' (Lf _) = fail) ∧
   (ptree_PE' (Nd nt args) =
-     if nt <> mkNT nPE' then NONE
+     if nt <> mkNT nPE' then fail
      else
        case args of
            [p_pt; arrow; e'_pt] =>
@@ -1081,156 +951,141 @@ val ptree_Expr_def = Define`
              assert(arrow = Lf (TOK DarrowT));
              p <- ptree_Pattern nPattern p_pt;
              e <- ptree_Expr nE' e'_pt;
-             SOME(p,e)
+             return (p,e)
            od
-         | _ => NONE) ∧
-  (ptree_Eseq (Lf _) = NONE) ∧
+         | _ => fail) ∧
+
+  (ptree_Eseq (Lf _) = fail) ∧
   (ptree_Eseq (Nd nt args) =
-    if nt <> mkNT nEseq then NONE
+    if nt <> mkNT nEseq then fail
     else
       case args of
           [single] =>
           do
             e <- ptree_Expr nE single;
-            SOME[e]
+            return [e]
           od
         | [e_pt; semi; seq_pt] =>
           do
             assert(semi = Lf (TOK SemicolonT));
             e <- ptree_Expr nE e_pt;
             seq <- ptree_Eseq seq_pt;
-            SOME(e::seq)
+            return (e::seq)
           od
-        | _ => NONE)
+        | _ => fail)
 `;
 
 
 val ptree_Decl_def = Define`
-  ptree_Decl pt : dec option =
+  ptree_Decl pt : dec M =
     case pt of
-       Lf _ => NONE
+       Lf _ => fail
      | Nd nt args =>
-       if nt <> mkNT nDecl then NONE
+       if nt <> mkNT nDecl then fail
        else
          case args of
              [dt] =>
              do
                tydec <- ptree_TypeDec dt;
-               SOME (Dtype tydec)
+               return (Dtype tydec)
              od ++ ptree_TypeAbbrevDec dt
            | [funtok; fdecls] =>
              do
                assert(funtok = Lf (TOK FunT));
                fdecs <- ptree_AndFDecls fdecls;
-               SOME (Dletrec fdecs)
+               return (Dletrec fdecs)
              od ++
              do
                assert (funtok = Lf (TOK ExceptionT));
                (enm, etys) <- ptree_Dconstructor fdecls;
-               SOME (Dexn enm etys)
+               return (Dexn enm etys)
              od
            | [valtok; patpt; eqtok; ept] =>
              do
                assert (valtok = Lf (TOK ValT) ∧ eqtok = Lf (TOK EqualsT));
-               pat <- ptree_Pattern nPattern patpt;
-               e <- ptree_Expr nE ept;
-               SOME (Dlet pat e)
+               lift2 Dlet (ptree_Pattern nPattern patpt) (ptree_Expr nE ept)
              od
-           | _ => NONE
+           | _ => fail
 `
 
 val ptree_Decls_def = Define`
-  ptree_Decls (Lf _) = NONE ∧
+  ptree_Decls (Lf _) = fail ∧
   ptree_Decls (Nd nt args) =
-    if nt <> mkNT nDecls then NONE
+    if nt <> mkNT nDecls then fail
     else
       case args of
-          [] => SOME []
+          [] => return []
         | [d_pt; ds_pt] =>
           if d_pt = Lf (TOK SemicolonT) then ptree_Decls ds_pt
           else
-            do
-              d <- ptree_Decl d_pt;
-              ds <- ptree_Decls ds_pt;
-              SOME(d::ds)
-            od
-        | _ => NONE
+            lift2 CONS (ptree_Decl d_pt) (ptree_Decls ds_pt)
+        | _ => fail
 `
 
 val ptree_OptTypEqn_def = Define`
-  ptree_OptTypEqn (Lf _) = NONE : t option option ∧
+  ptree_OptTypEqn (Lf _) = fail : t option M ∧
   ptree_OptTypEqn (Nd nt args) =
-    if nt <> mkNT nOptTypEqn then NONE
+    if nt <> mkNT nOptTypEqn then fail
     else
       case args of
-          [] => SOME NONE
+          [] => return NONE
         | [eqtok; typ_pt] =>
           do
             assert (eqtok = Lf (TOK EqualsT));
             typ <- ptree_Type nType typ_pt;
-            SOME (SOME typ)
+            return (SOME typ)
           od
-        | _ => NONE
+        | _ => fail
 `
 
 val ptree_SpecLine_def = Define`
-  ptree_SpecLine (Lf _) = NONE ∧
+  ptree_SpecLine (Lf _) = fail ∧
   ptree_SpecLine (Nd nt args) =
-    if nt <> mkNT nSpecLine then NONE
+    if nt <> mkNT nSpecLine then fail
     else
       case args of
-          [td_pt] =>
-          do
-            td <- ptree_TypeDec td_pt;
-            SOME(Stype td)
-          od
+          [td_pt] => lift Stype (ptree_TypeDec td_pt)
         | [exntok; dcon_pt] =>
           do
             assert (exntok = Lf (TOK ExceptionT));
             (nm,tys) <- ptree_Dconstructor dcon_pt;
-            SOME(Sexn nm tys)
+            return (Sexn nm tys)
           od
         | [typetok; tynm_pt; opteqn_pt] =>
           do
             assert(typetok = Lf (TOK TypeT));
             (vs,nm) <- ptree_TypeName tynm_pt;
             opteqn <- ptree_OptTypEqn opteqn_pt;
-            SOME(case opteqn of
-                     NONE => Stype_opq vs nm
-                   | SOME ty => Stabbrev vs nm ty)
+            return (case opteqn of
+                        NONE => Stype_opq vs nm
+                      | SOME ty => Stabbrev vs nm ty)
           od
         | [valtok; vname_pt; coltok; type_pt] =>
           do
             assert(valtok = Lf (TOK ValT) ∧ coltok = Lf (TOK ColonT));
-            vname <- ptree_V vname_pt;
-            ty <- ptree_Type nType type_pt;
-            SOME(Sval vname ty)
+            lift2 Sval (ptree_V vname_pt) (ptree_Type nType type_pt)
           od
-        | _ => NONE
+        | _ => fail
 `
 
 val ptree_SpeclineList_def = Define`
-  ptree_SpeclineList (Lf _) = NONE ∧
+  ptree_SpeclineList (Lf _) = fail ∧
   ptree_SpeclineList (Nd nt args) =
-    if nt <> mkNT nSpecLineList then NONE
+    if nt <> mkNT nSpecLineList then fail
     else
       case args of
-          [] => SOME []
+          [] => return []
         | [sl_pt; sll_pt] =>
           if sl_pt = Lf (TOK SemicolonT) then ptree_SpeclineList sll_pt
           else
-            do
-              sl <- ptree_SpecLine sl_pt;
-              sll <- ptree_SpeclineList sll_pt;
-              SOME(sl::sll)
-            od
-        | _ => NONE
+              lift2 CONS (ptree_SpecLine sl_pt) (ptree_SpeclineList sll_pt)
+        | _ => fail
 `
 
 val ptree_SignatureValue_def = Define`
-  ptree_SignatureValue (Lf _) = NONE ∧
+  ptree_SignatureValue (Lf _) = fail ∧
   ptree_SignatureValue (Nd nt args) =
-    if nt <> mkNT nSignatureValue then NONE
+    if nt <> mkNT nSignatureValue then fail
     else
       case args of
           [sigtok; sll_pt; endtok] =>
@@ -1238,23 +1093,23 @@ val ptree_SignatureValue_def = Define`
             assert(sigtok = Lf (TOK SigT) ∧ endtok = Lf (TOK EndT));
             ptree_SpeclineList sll_pt
           od
-        | _ => NONE
+        | _ => fail
 `;
 
 val ptree_StructName_def = Define`
-  ptree_StructName (Lf _) = NONE ∧
+  ptree_StructName (Lf _) = fail ∧
   ptree_StructName (Nd nm args) =
-    if nm <> mkNT nStructName then NONE
+    if nm <> mkNT nStructName then fail
     else
       case args of
-          [pt] => destAlphaT ' (destTOK ' (destLf pt))
-        | _ => NONE
+          [pt] => opt (destAlphaT ' (destTOK ' (destLf pt)))
+        | _ => fail
 `
 
 val ptree_Structure_def = Define`
-  ptree_Structure (Lf _) = NONE ∧
+  ptree_Structure (Lf _) = fail ∧
   ptree_Structure (Nd nt args) =
-    if nt <> mkNT nStructure then NONE
+    if nt <> mkNT nStructure then fail
     else
       case args of
           [structuretok; sname_pt; asc_opt; eqtok; structtok; ds_pt; endtok] =>
@@ -1264,68 +1119,63 @@ val ptree_Structure_def = Define`
                    eqtok = Lf (TOK EqualsT) ∧ endtok = Lf (TOK EndT));
             sname <- ptree_StructName sname_pt;
             asc <- case asc_opt of
-                       Lf _ => NONE
+                       Lf _ => fail
                      | Nd nt args =>
-                         if nt <> mkNT nOptionalSignatureAscription then NONE
+                         if nt <> mkNT nOptionalSignatureAscription then fail
                          else
                            case args of
-                               [] => SOME NONE
+                               [] => return NONE
                              | [sealtok; sig_pt] =>
                                do
                                  assert(sealtok = Lf (TOK SealT));
                                  sigv <- ptree_SignatureValue sig_pt;
-                                 SOME (SOME sigv)
+                                 return (SOME sigv)
                                od
-                             | _ => NONE;
+                             | _ => fail;
             ds <- ptree_Decls ds_pt;
-            SOME(Tmod sname asc ds)
+            return (Tmod sname asc ds)
           od
-        | _ => NONE
+        | _ => fail
 `
 
 val ptree_TopLevelDec_def = Define`
-  ptree_TopLevelDec (Lf _) = NONE ∧
+  ptree_TopLevelDec (Lf _) = fail ∧
   ptree_TopLevelDec (Nd nt args) =
-    if nt <> mkNT nTopLevelDec then NONE
+    if nt <> mkNT nTopLevelDec then fail
     else
       case args of
           [pt] =>
-            ptree_Structure pt ++
-            OPTION_MAP Tdec (ptree_Decl pt)
-        | _ => NONE
+            ptree_Structure pt ++ lift Tdec (ptree_Decl pt)
+        | _ => fail
 `
 
 val ptree_TopLevelDecs_def = Define`
-  ptree_TopLevelDecs (Lf _) = NONE ∧
+  ptree_TopLevelDecs (Lf _) = fail ∧
   ptree_TopLevelDecs (Nd nt args) =
-    if nt <> mkNT nTopLevelDecs then NONE
+    if nt <> mkNT nTopLevelDecs then fail
     else
       case args of
-          [] => SOME []
+          [] => return []
         | [td_pt; tds_pt] =>
           if td_pt = Lf (TOK SemicolonT) then ptree_TopLevelDecs tds_pt
           else
-          do
-            td <- ptree_TopLevelDec td_pt;
-            tds <- ptree_TopLevelDecs tds_pt;
-            SOME(td::tds)
-          od
-        | _ => NONE
+            lift2 CONS (ptree_TopLevelDec td_pt) (ptree_TopLevelDecs tds_pt)
+        | _ => fail
 `;
 
 val ptree_REPLTop_def = Define`
-  ptree_REPLTop (Lf _) = NONE ∧
+  ptree_REPLTop (Lf _) = fail ∧
   ptree_REPLTop (Nd nt args) =
-    if nt <> mkNT nREPLTop then NONE
+    if nt <> mkNT nREPLTop then fail
     else
       case args of
           [pt; semitok] =>
             ptree_TopLevelDec pt ++
             do
               e <- ptree_Expr nE pt;
-              SOME(Tdec (Dlet (Pvar "it") e))
+              return (Tdec (Dlet (Pvar "it") e))
             od
-         | _ => NONE
+         | _ => fail
 `;
 
 

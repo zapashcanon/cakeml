@@ -18,13 +18,13 @@ val parse_def = Define`
     case some pt. valid_ptree cmlG pt ∧ ptree_head pt = NT (mkNT nTopLevelDecs) ∧
                   ptree_fringe pt = MAP TOK toks
     of
-       NONE => NONE
+       NONE => fail
      | SOME p => ptree_TopLevelDecs p`
 
 val standalone_def = Define`
-  standalone init_state type_error input =
-    case parse (lexer_fun input) of
+  standalone init_state fixitystate type_error input =
+    case parse (lexer_fun input) fixitystate of
     | NONE => SOME "<parse error>\n"
-    | SOME prog => OPTION_JOIN (some output. ast_standalone init_state type_error prog output)`
+    | SOME (prog, _) => OPTION_JOIN (some output. ast_standalone init_state type_error prog output)`
 
 val _ = export_theory()

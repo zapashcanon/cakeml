@@ -67,11 +67,22 @@ val parse_def = Define`
     case some pt. valid_ptree cmlG pt ∧ ptree_head pt = NT (mkNT nREPLTop) ∧
                   ptree_fringe pt = MAP TOK toks
     of
-       NONE => NONE
+       NONE => fail
      | SOME p => ptree_REPLTop p
 `
 
+val mMAP_def = Define`
+  (mMAP f s0 [] = []) ∧
+  (mMAP f s0 (h::t) =
+     case f h s0 of
+         NONE => NONE :: mMAP f s0 t
+       | SOME (r, s') => SOME r :: mMAP f s' t)
+`;
+
 val repl_def = Define `
-repl init_repl_state input = ast_repl init_repl_state (MAP parse (split_top_level_semi (lexer_fun input)))`;
+  repl init_repl_state fixitystate input =
+  ast_repl init_repl_state
+           (mMAP parse fixitystate
+                 (split_top_level_semi (lexer_fun input)))`;
 
 val _ = export_theory ();
