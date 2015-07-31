@@ -2,7 +2,7 @@ open HolKernel Parse boolLib bossLib
 
 open gramTheory tokenUtilsTheory astTheory
 
-open monadsyntax lcsymtacs
+open monadsyntax lcsymtacs precparserTheory
 
 open errorStateMonadTheory
 
@@ -20,8 +20,12 @@ val _ = hide "nt"
 
 (* handling constructor arities gets very complicated when "open" is
    implemented *)
-val _ = Datatype`PCstate0 = <| fixities : string |-> num option ;
-                               ctr_arities : string id |-> num |>`
+val _ = Datatype`associativity = Left | Right`;
+val _ = Datatype`
+  PCstate0 = <| fixities : string |-> (num # associativity) option ;
+                ctr_arities : string id |-> num
+  |>
+`
 (* recording a fixity of NONE is what you have to do to represent an
    explicit nonfix declaration *)
 
@@ -47,13 +51,39 @@ val fixity_lookup_def = Define`
             | SOME r => r
 `;
 
+val aFix_def = Define`
+  aFix (fm : string -> (num # associativity) option) a =
+    case a of
+        Con (SOME (Short s)) [] => fm s
+      | Var (Short s) => fm s
+      | _ => NONE
+`
+
+val pMachineOf_def = Define`
+  pMachineOf (fm : string -> (num # associativity) option) =
+    <| isOp := IS_SOME o aFix fm ;
+       rules :=
+          (λ(l,r). case (aFix fm l, aFix fm r) of
+                     (SOME (li,la), SOME (ri,ra)) =>
+                       if li < ri then SOME Shift
+                       else if li = ri then
+                         if la = ra then if la = Left then SOME Reduce
+                                         else SOME Shift
+                         else NONE
+                       else SOME Reduce
+                    | _ => NONE) ;
+       lift := (λx. x) ;
+       reduce := (λa1 opt a2. ARB) (* FIXME *) ;
+       mkApp := (λa1 a2. App Opapp [a1; a2]) (* FIXME *) |>`
+
+
 
 (* mfixity_lookup : string -> num M
     'fails' if the string has no fixity, even though it is perfectly
     reasonable for a string to be nonfix.
 *)
 val mfixity_lookup_def = Define`
-  mfixity_lookup nm : num M =
+  mfixity_lookup nm : (num # associativity) M =
     λpcs. OPTION_MAP (λr. (r, pcs)) (fixity_lookup nm pcs)
 `
 
