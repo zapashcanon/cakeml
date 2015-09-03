@@ -51,6 +51,16 @@ val fixity_lookup_def = Define`
             | SOME r => r
 `;
 
+val arity_lookup_def = Define`
+  arity_lookup i pcs =
+    case pcs of
+        [] => NONE
+      | pc0 :: rest =>
+        case FLOOKUP pc0.ctr_arities i of
+            NONE => arity_lookup i rest
+          | SOME n => SOME n
+`;
+
 val aFix_def = Define`
   aFix (fm : string -> (num # associativity) option) a =
     case a of
@@ -58,23 +68,6 @@ val aFix_def = Define`
       | Var (Short s) => fm s
       | _ => NONE
 `
-
-val pMachineOf_def = Define`
-  pMachineOf (fm : string -> (num # associativity) option) =
-    <| isOp := IS_SOME o aFix fm ;
-       rules :=
-          (λ(l,r). case (aFix fm l, aFix fm r) of
-                     (SOME (li,la), SOME (ri,ra)) =>
-                       if li < ri then SOME Shift
-                       else if li = ri then
-                         if la = ra then if la = Left then SOME Reduce
-                                         else SOME Shift
-                         else NONE
-                       else SOME Reduce
-                    | _ => NONE) ;
-       lift := (λx. x) ;
-       reduce := (λa1 opt a2. ARB) (* FIXME *) ;
-       mkApp := (λa1 a2. App Opapp [a1; a2]) (* FIXME *) |>`
 
 
 
@@ -86,6 +79,15 @@ val mfixity_lookup_def = Define`
   mfixity_lookup nm : (num # associativity) M =
     λpcs. OPTION_MAP (λr. (r, pcs)) (fixity_lookup nm pcs)
 `
+
+(* marity_lookup : string id -> num M
+     'fails' if the identifier has no arity, though again, it is reasonable
+     for something not to
+*)
+val marity_lookup_def = Define`
+  marity_lookup nm : num M =
+    λpcs. OPTION_MAP (λr. (r, pcs)) (arity_lookup nm pcs)
+`;
 
 val mFUPD_HD_def = Define`
   mFUPD_HD f pcs =
@@ -124,7 +126,7 @@ val mpop_namedscope_def = Define`
 
 
 (* ----------------------------------------------------------------------
-    We'll be using the option monad quite a bit in what follows
+    We'll be using the error-state monad quite a bit in what follows
    ---------------------------------------------------------------------- *)
 
 val _ = overload_on ("monad_bind", ``errorStateMonad$BIND``)
@@ -516,6 +518,46 @@ val mkID_def = Define`
   (mkID (SOME str) s = Long str s)
 `;
 
+
+(* something has already figured out if the operator is a constructor or a
+   variable (the leaf level analysis of names will do that).  *)
+val mmkApp_def = Define`
+  mmkApp opt args =
+    case opt of
+      Con (SOME id) [] =>
+        do
+          arity <- marity_lookup id;
+          if arity = 1 then
+            return (Con (SOME id) [Con NONE args])
+          else
+            return (Con (SOME id) args)
+        od
+    | Con _ _ => fail
+    | Var id => return (FOLDL (λt a. App Opapp [a; t]) opt args)
+    | _ => fail
+`
+
+val pMachineOf_def = Define`
+  pMachineOf pcs =
+    let fm i = fixity_lookup i pcs
+    in
+      <| isOp := IS_SOME o aFix fm ;
+         rules :=
+            (λ(l,r). case (aFix fm l, aFix fm r) of
+                       (SOME (li,la), SOME (ri,ra)) =>
+                         if li < ri then SOME Shift
+                         else if li = ri then
+                           if la = ra then if la = Left then SOME Reduce
+                                           else SOME Shift
+                           else NONE
+                         else SOME Reduce
+                      | _ => NONE) ;
+         lift := (λx. x) ;
+         reduce := (λt1 opt t2. OPTION_MAP FST (mmkApp opt [t1; t2] pcs)) ;
+         mkApp := (λf x. OPTION_MAP FST (mmkApp f [x] pcs)) |>`
+
+
+
 val ptree_OpID_def = Define`
   ptree_OpID _ _ (Lf _) = fail ∧
   ptree_OpID cf vf (Nd nt subs) =
@@ -744,9 +786,11 @@ val ptree_Expr_def = Define`
         case subs of
             [pt] => ptree_Expr nEbase pt
           | [pt1; pt2] =>
-            lift2 mkAst_App
-                  (ptree_Expr nEbase pt1)
-                  (ptree_Expr nEops pt2)
+               do
+                 f <- ptree_Expr nEbase pt1 ;
+                 x <- ptree_Expr nEops pt2 ;
+                 mmkApp f [x]
+               od
           | _ => fail
       else if nt = mkNT nEtyped then
         case subs of
