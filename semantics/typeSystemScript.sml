@@ -579,21 +579,24 @@ type_e tenv (If e1 e2 e3) t)
 ==>
 type_e tenv (Mat e pes) t2)
 
+/\ (! tenv n e1 e2 t1 t2 tvs.
+(is_value e1 /\
+type_e (tenv with<| v := bind_tvar tvs tenv.v|>) e1 t1 /\
+type_e (tenv with<| v := opt_bind_name n tvs t1 tenv.v|>) e2 t2)
+==>
+type_e tenv (Let n e1 e2) t2)
+
 /\ (! tenv n e1 e2 t1 t2.
 (type_e tenv e1 t1 /\
 type_e (tenv with<| v := opt_bind_name n( 0) t1 tenv.v|>) e2 t2)
 ==>
 type_e tenv (Let n e1 e2) t2)
 
-(*
-and
-
-letrec : forall tenv funs e t tenv' tvs.
-type_funs (bind_var_list 0 tenv' (bind_tvar tvs tenv)) funs tenv' &&
-type_e (bind_var_list tvs tenv' tenv) e t
+/\ (! tenv funs e t bindings tvs.
+(type_funs (tenv with<| v := bind_var_list( 0) bindings (bind_tvar tvs tenv.v)|>) funs bindings /\
+type_e (tenv with<| v := bind_var_list tvs bindings tenv.v|>) e t)
 ==>
-type_e tenv (Letrec funs e) t
-*)
+type_e tenv (Letrec funs e) t)
 
 /\ (! tenv funs e t bindings.
 (type_funs (tenv with<| v := bind_var_list( 0) bindings tenv.v|>) funs bindings /\
