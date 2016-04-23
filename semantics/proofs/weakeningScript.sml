@@ -355,13 +355,27 @@ val type_e_weakening_lem = Q.prove (
      first_x_assum match_mp_tac >>
      rw [weak_tenvE_bind_var_list])
  >- (
+   disj1_tac>>
    qexists_tac `t` >>
+   qexists_tac `tvs` >>
    rw [] >>
    first_x_assum match_mp_tac >>
    rw [] >>
    metis_tac [weak_tenvE_opt_bind, weak_tenvE_bind_tvar])
- (* COMPLETENESS >- metis_tac [weak_tenvE_opt_bind, weak_tenvE_bind_tvar], *)
  >- (
+   disj2_tac>>
+   qexists_tac`t`>>rw[]>>
+   first_x_assum match_mp_tac >>
+   rw [] >>
+   metis_tac [weak_tenvE_opt_bind, weak_tenvE_bind_tvar])
+ >- (
+   disj1_tac>>
+   qexists_tac`tenv''`>>qexists_tac`tvs`>>
+   rw[]>>first_x_assum match_mp_tac>>
+   rw[]>>
+   metis_tac [weak_tenvE_bind_var_list, weak_tenvE_bind_tvar])
+ >- (
+   disj2_tac>>
    qexists_tac `tenv''` >>
    rw [] >>
    first_x_assum match_mp_tac >>

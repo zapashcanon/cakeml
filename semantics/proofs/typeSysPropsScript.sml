@@ -1149,19 +1149,10 @@ val type_e_freevars = Q.store_thm ("type_e_freevars",
      full_simp_tac(srw_ss())[RES_FORALL, num_tvs_bind_var_list] >>
      qpat_assum `!x. P x` (ASSUME_TAC o Q.SPEC `(FST h, SND h)`) >>
      full_simp_tac(srw_ss())[] >>
-     metis_tac [type_p_freevars, tenv_val_ok_bind_var_list])
- >- (every_case_tac >>
-     full_simp_tac(srw_ss())[num_tvs_def, tenv_val_ok_def])
-     (* COMPLETENESS
- >- (every_case_tac >>
-     full_simp_tac(srw_ss())[num_tvs_def, tenv_ok_def])
- >- (every_case_tac >>
-     full_simp_tac(srw_ss())[num_tvs_def, tenv_ok_def])
-     *)
- >- metis_tac [tenv_ok_bind_var_list_funs, num_tvs_bind_var_list]
- (* COMPLETENESS
- >- metis_tac [tenv_ok_bind_var_list_tvs, num_tvs_bind_var_list, bind_tvar_def]
- *));
+     metis_tac [type_p_freevars, tenv_val_ok_bind_var_list])>>
+ every_case_tac >>
+ full_simp_tac(srw_ss())[num_tvs_def, tenv_val_ok_def]>>
+ metis_tac [tenv_ok_bind_var_list_tvs, num_tvs_bind_var_list, bind_tvar_def]);
 
 val type_e_subst = Q.store_thm ("type_e_subst",
 `(!tenv e t. type_e tenv e t ⇒
@@ -1312,28 +1303,15 @@ val type_e_subst = Q.store_thm ("type_e_subst",
      match_mp_tac tenv_val_ok_bind_var_list >>
      srw_tac[][num_tvs_db_merge, bind_tvar_rewrites] >>
      metis_tac [type_p_freevars])
-     (* COMPLETENESS
  >- (disj1_tac >>
      srw_tac[][] >>
      qexists_tac `deBruijn_subst (tvs + num_tvs tenvE1)
                         (MAP (deBruijn_inc 0 (tvs + num_tvs tenvE1)) targs) t` >>
      qexists_tac `tvs` >>
      srw_tac[][] >|
-     [qpat_assum `∀tenvE1' targs' tvs''.
-                     EVERY (check_freevars tvs'' []) targs' ∧
-                     (bind_tvar tvs
-                        (db_merge tenvE1 (bind_tvar (LENGTH targs) tenvE2)) =
-                      db_merge tenvE1' (bind_tvar (LENGTH targs') tenvE2)) ⇒
-                     type_e tenvM tenvC
-                       (db_merge (deBruijn_subst_tenvE targs' tenvE1')
-                          (bind_tvar tvs'' tenvE2))
-                       e
-                       (deBruijn_subst (num_tvs tenvE1')
-                          (MAP (deBruijn_inc 0 (num_tvs tenvE1')) targs') t)`
-                (MP_TAC o Q.SPECL [`bind_tvar tvs tenvE1`, `targs`, `tvs'`]) >>
-          srw_tac[][bind_tvar_rewrites] >>
-          full_simp_tac(srw_ss())[MAP_MAP_o, combinTheory.o_DEF, deBruijn_inc_deBruijn_inc] >>
-          metis_tac [],
+     [qpat_assum `∀A B C. EVERY D E ∧ G ⇒ H`
+          (MP_TAC o Q.SPECL [`bind_tvar tvs tenvE1`, `targs`, `tvs'`]) >>
+          srw_tac[][bind_tvar_rewrites],
       every_case_tac >>
           full_simp_tac(srw_ss())[tenv_ok_def] >>
           FIRST_X_ASSUM
@@ -1342,9 +1320,8 @@ val type_e_subst = Q.store_thm ("type_e_subst",
           srw_tac[][bind_tvar_rewrites, db_merge_def, deBruijn_subst_tenvE_def,
               num_tvs_def] >>
           imp_res_tac type_e_freevars >>
-          full_simp_tac(srw_ss())[tenv_ok_def, num_tvs_def, bind_tvar_rewrites, num_tvs_db_merge]])
-          *)
- >- ((* COMPLETENESS disj2_tac >> *)
+          full_simp_tac(srw_ss())[tenv_val_ok_def, num_tvs_def, bind_tvar_rewrites, num_tvs_db_merge]])
+ >- (disj2_tac >>
      srw_tac[][] >>
      qexists_tac `deBruijn_subst (num_tvs tenvE1)
                         (MAP (deBruijn_inc 0 (num_tvs tenvE1)) targs) t` >>
@@ -1359,64 +1336,30 @@ val type_e_subst = Q.store_thm ("type_e_subst",
      first_x_assum match_mp_tac >>
      srw_tac[][] >>
      rev_full_simp_tac(srw_ss())[tenv_val_ok_def, num_tvs_def, bind_tvar_rewrites, num_tvs_db_merge])
-     (* COMPLETENESS
- >- (qexists_tac `MAP (λ(x,t').
+ >- (disj1_tac>>
+     qexists_tac `MAP (λ(x,t').
                  (x,
                   deBruijn_subst (tvs + num_tvs tenvE1)
                     (MAP (deBruijn_inc 0 (tvs + num_tvs tenvE1)) targs)
                     t')) env` >>
      qexists_tac `tvs` >>
      srw_tac[][] >|
-     [qpat_assum `∀tenvE1' targs' tvs''.
-                     tenv_ok
-                       (bind_var_list 0 env
-                          (bind_tvar tvs
-                             (db_merge tenvE1 (bind_tvar (LENGTH targs) tenvE2)))) ∧
-                     EVERY (check_freevars tvs'' []) targs' ∧
-                     (bind_var_list 0 env
-                        (bind_tvar tvs
-                           (db_merge tenvE1 (bind_tvar (LENGTH targs) tenvE2))) =
-                      db_merge tenvE1' (bind_tvar (LENGTH targs') tenvE2)) ⇒
-                     type_funs tenvM tenvC
-                       (db_merge (deBruijn_subst_tenvE targs' tenvE1')
-                          (bind_tvar tvs'' tenvE2))
-                       funs
-                       (MAP
-                          (λ(x,t).
-                             (x,
-                              deBruijn_subst (num_tvs tenvE1')
-                                (MAP (deBruijn_inc 0 (num_tvs tenvE1')) targs') t))
-                          env)`
-                 (MP_TAC o
-                  Q.SPECL [`bind_var_list 0 env (bind_tvar tvs tenvE1)`, `targs`, `tvs'`]) >>
-          srw_tac[][bind_tvar_rewrites, db_merge_bind_var_list, num_tvs_bind_var_list,
-              deBruijn_subst_E_bind_var_list] >>
+     [
+     qpat_assum`∀A B C. D ⇒ type_funs E G env`
+          (MP_TAC o Q.SPECL [`bind_var_list 0 env (bind_tvar tvs tenvE1)`, `targs`, `tvs'`]) >>
+          srw_tac[][bind_tvar_rewrites, db_merge_bind_var_list, num_tvs_bind_var_list,deBruijn_subst_E_bind_var_list] >>
           pop_assum match_mp_tac >>
           match_mp_tac tenv_ok_bind_var_list_funs >>
           srw_tac[][bind_tvar_rewrites] >>
           metis_tac [],
-      qpat_assum `∀tenvE1' targs' tvs''.
-                     tenv_ok
-                       (bind_var_list tvs env
-                          (db_merge tenvE1 (bind_tvar (LENGTH targs) tenvE2))) ∧
-                     EVERY (check_freevars tvs'' []) targs' ∧
-                     (bind_var_list tvs env
-                        (db_merge tenvE1 (bind_tvar (LENGTH targs) tenvE2)) =
-                      db_merge tenvE1' (bind_tvar (LENGTH targs') tenvE2)) ⇒
-                     type_e tenvM tenvC
-                       (db_merge (deBruijn_subst_tenvE targs' tenvE1')
-                          (bind_tvar tvs'' tenvE2))
-                       e
-                       (deBruijn_subst (num_tvs tenvE1')
-                          (MAP (deBruijn_inc 0 (num_tvs tenvE1')) targs') t)`
-                 (MP_TAC o
-                  Q.SPECL [`bind_var_list tvs env tenvE1`, `targs`, `tvs'`]) >>
+      qpat_assum `∀A B C. D ⇒ type_e E G H`
+           (MP_TAC o Q.SPECL [`bind_var_list tvs env tenvE1`, `targs`, `tvs'`]) >>
           srw_tac[][num_tvs_bind_var_list, deBruijn_subst_E_bind_var_list, db_merge_bind_var_list] >>
-          pop_assum match_mp_tac >>
+          pop_assum ho_match_mp_tac >>
+          qpat_assum`A=B` sym_sub_tac>>
           match_mp_tac tenv_ok_bind_var_list_tvs >>
           metis_tac []])
-          *)
- >- (qexists_tac `MAP (λ(x,t').
+ >- (disj2_tac>>qexists_tac `MAP (λ(x,t').
                  (x,
                   deBruijn_subst (num_tvs tenvE1)
                     (MAP (deBruijn_inc 0 (num_tvs tenvE1)) targs)
@@ -3109,13 +3052,12 @@ val type_e_closed = prove(
     every_case_tac >>
     full_simp_tac(srw_ss())[opt_bind_name_def] >>
     metis_tac[] ) >>
-    (* COMPLETENESS
   strip_tac >- (
     simp[] >>
     srw_tac[DNF_ss][SUBSET_DEF,bind_tvar_def] >>
     every_case_tac >>
     full_simp_tac(srw_ss())[opt_bind_name_def] >>
-    metis_tac[] ) >> *)
+    metis_tac[] ) >>
   strip_tac >- (
     simp[tenv_names_bind_var_list] >>
     rpt gen_tac >> strip_tac >>
@@ -3135,7 +3077,17 @@ val type_e_closed = prove(
     srw_tac[][] >>
     full_simp_tac(srw_ss())[EXTENSION] >>
     metis_tac []) >>
-  strip_tac >- simp[] >>
+  strip_tac >-
+    (rw[tenv_names_bind_var_list] >>
+    imp_res_tac type_funs_MAP_FST>>
+    fs[EXTENSION,SUBSET_DEF,MEM_MAP,EXISTS_PROD,FORALL_PROD]>>rw[]
+    >-
+      (last_x_assum(qspec_then `x` assume_tac)>>rfs[]>>
+      metis_tac[MEM_MAP,EXISTS_PROD,FORALL_PROD,PAIR,FST])
+    >>
+      first_x_assum(qspec_then `x` assume_tac)>>rfs[]>>
+      metis_tac[MEM_MAP,EXISTS_PROD,FORALL_PROD,PAIR,FST])>>
+  strip_tac>- simp[] >>
   strip_tac >- simp[] >>
   simp[] >>
   srw_tac[][SUBSET_DEF] >>

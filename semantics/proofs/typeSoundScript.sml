@@ -408,6 +408,7 @@ val exp_type_progress = Q.prove (
           full_simp_tac(srw_ss())[do_app_def, type_op_def, LIST_REL_NIL, type_es_list_rel] >>
           srw_tac[][] >>
           full_simp_tac(srw_ss())[],
+      metis_tac [type_funs_distinct],
       metis_tac [type_funs_distinct]])
  >- (srw_tac[][continue_def] >>
      full_simp_tac(srw_ss())[Once type_ctxts_cases, type_ctxt_cases, return_def, push_def] >>
@@ -1118,28 +1119,20 @@ val exp_type_preservation = Q.prove (
          srw_tac[][Once type_ctxts_cases, type_ctxt_cases] >>
          ONCE_REWRITE_TAC [context_invariant_cases] >>
          full_simp_tac(srw_ss())[bind_tvar_def]
-         (* COMPLETENESS
          >- (qexists_tac `tenvS` >>
              srw_tac[][] >>
-             qexists_tac `tenvM` >>
-             qexists_tac `tenvC` >>
              qexists_tac `t1'` >>
              qexists_tac `tenv` >>
              qexists_tac `tvs` >>
-             srw_tac[][] >>
-             qexists_tac `tenvM` >>
-             qexists_tac `tenvC` >>
-             qexists_tac `tenv` >>
-             qexists_tac `t1` >>
-             srw_tac[][] >-
-             metis_tac [arithmeticTheory.ADD, arithmeticTheory.ADD_COMM,
-                        num_tvs_def, type_v_freevars, tenv_val_ok_def,
-                        type_e_freevars] >>
+             fs[]>>
+             qexists_tac`tenv`>>
+             qexists_tac`t1`>>
              full_simp_tac(srw_ss())[is_ccon_def] >>
-             metis_tac [arithmeticTheory.ADD, arithmeticTheory.ADD_COMM,
-                        num_tvs_def, type_v_freevars, tenv_val_ok_def,
-                        type_e_freevars])
-                        *)
+             imp_res_tac type_v_freevars>>
+             Cases_on`tvs=0`>>fs[]>>imp_res_tac type_e_freevars>>
+             rfs[]>>
+             fs[tenv_val_ok_def,num_tvs_def]>>
+             rfs[])
          >- (qexists_tac `tenvS` >>
              srw_tac[][] >>
              qexists_tac `t1'` >>
@@ -1161,8 +1154,13 @@ val exp_type_preservation = Q.prove (
          srw_tac[][build_rec_env_merge] >>
          qexists_tac `tenvS` >>
          srw_tac[][] >>
-         qexists_tac `t1` >>
-         (* COMPLETENESS qexists_tac `bind_var_list tvs tenv' tenv` >>*)
+         qexists_tac `t1`
+         >-
+           (qexists_tac `tenv with v := bind_var_list tvs bindings tenv.v` >>
+           rw [] >> fs [bind_tvar_def] >>
+           qexists_tac `0` >>
+           rw [] >>
+           metis_tac [type_recfun_env, type_env_merge, bind_tvar_def])>>
          qexists_tac `tenv with v := bind_var_list 0 bindings tenv.v` >>
          srw_tac[][] >>
          full_simp_tac(srw_ss())[bind_tvar_def] >>
