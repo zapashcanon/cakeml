@@ -800,7 +800,7 @@ val exp_rel_thm = save_thm(
   "exp_rel_thm",
   exp_rel_def
       |> SIMP_RULE (srw_ss() ++ DNF_ss) [exec_rel_rw, evaluate_ev_def,
-                                         AND_IMP_INTRO])
+                                         AND_IMP_INTRO]);
 
 val exp_rel_NIL_CONS = Q.store_thm(
   "exp_rel_NIL_CONS[simp]",

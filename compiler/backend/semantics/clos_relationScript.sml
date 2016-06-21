@@ -2176,6 +2176,48 @@ val evaluate_ev_timeout_clocks0 = Q.store_thm(
   Cases_on `e` >> dsimp[evaluate_ev_def, eqs, pair_case_eq, bool_case_eq] >>
   rpt strip_tac >> imp_res_tac evaluate_timeout_clocks0);
 
+
+val state_rel_refl1 = Q.store_thm ("state_rel_refl1",
+  `state_rel j w s1 s2 ⇒ state_rel j w s1 s1`,
+ rw []
+ >> match_mp_tac state_rel_refl
+ >> fs [Once state_rel_rw]);
+
+val state_rel_refl2 = Q.store_thm ("state_rel_refl2",
+  `!i j w (s1:'ffi closSem$state) s2.
+    (∀i' (s'':'ffi closSem$state) s''' env env' e e'.
+      i' < i ∧ state_rel i' w s'' s''' ∧
+       LIST_REL (λa' a. val_rel (:'ffi) i' w a' a) env env' ∧
+       exec_rel i' w (Exp [e] env,s'') (Exp [e'] env',s''') ⇒
+         !st3. exec_rel i' w (Exp [e'] env',s''') st3 ⇒
+         exec_rel i' w (Exp [e] env,s'') st3)
+   ⇒
+   j < i ∧ state_rel j w s1 s2 ⇒ state_rel j w s2 s2`,
+ rw []
+ >> match_mp_tac state_rel_refl
+ >> pop_assum mp_tac
+ >> ONCE_REWRITE_TAC [state_rel_rw]
+ >> rw [state_ok_def, FEVERY_DEF]
+ >> pairarg_tac
+ >> fs []
+ >> first_x_assum drule
+ >> rw []
+ >> fs [fmap_rel_def, FLOOKUP_DEF]
+ >> first_x_assum drule
+ >> pairarg_tac
+ >> fs []
+ >> pairarg_tac
+ >> fs []
+ >> rw []
+ >> `i' < i` by decide_tac
+ >> imp_res_tac state_rel_refl1
+ >> first_x_assum irule
+ >- decide_tac
+ >> qexists_tac `e'`
+ >> qexists_tac `env`
+ >> qexists_tac `s`
+ >> simp [val_rel_refl, refl_list_rel_refl]);
+
 val val_rel_trans = Q.store_thm ("val_rel_trans",
 `(!(ffi:'ffi itself) i w v1 v2.
     val_rel ffi i w v1 v2 ⇒ !v3. val_rel ffi i w v2 v3 ⇒ val_rel ffi i w v1 v3) ∧
@@ -2234,6 +2276,8 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp_tac (srw_ss()) [val_rel_rw, optCASE_NONE_F, optCASE_NONE_T] >>
   conj_tac >- metis_tac[check_closures_trans] >>
   qx_genl_tac [`j`, `vs1`, `vs2`, `s1`, `s2`, `clocopt`] >> strip_tac >>
+  `state_rel j w s2 s2`
+    by (irule state_rel_refl2 >> cheat) >>
   rpt (first_x_assum (qspecl_then [`j`, `s1`, `s2`]
                         (fn th => mp_tac th >>
                                   simp[SimpL ``$==>``] >>
@@ -2251,6 +2295,7 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp[SimpL ``$==>``, optCASE_NONE_F] >>
   disch_then (qx_choose_then `dcres2` mp_tac) >>
   `vs2 ≠ []` by (strip_tac >> full_simp_tac(srw_ss())[]) >>
+
   Cases_on `dcres` >> Cases_on `dcres2` >> simp[SimpL ``$==>``] >>
   disch_then (fn th => RULE_ASSUM_TAC (SIMP_RULE (srw_ss()) [th]) >>
                        strip_assume_tac th) >>
@@ -2289,6 +2334,7 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp_tac (srw_ss()) [val_rel_rw, optCASE_NONE_F, optCASE_NONE_T] >>
   conj_tac >- metis_tac[check_closures_trans] >>
   qx_genl_tac [`j`, `vs1`, `vs2`, `s1`, `s2`, `clocopt`] >> strip_tac >>
+  `state_rel j w s2 s2` by cheat >>
   rpt (first_x_assum (qspecl_then [`j`, `s1`, `s2`]
                         (fn th => mp_tac th >>
                                   simp[SimpL ``$==>``] >>
@@ -2383,21 +2429,36 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
    >- (irule fmap_rel_trans >> metis_tac[])
    >- (irule fmap_rel_trans
        >- (simp_tac (srw_ss()) [FORALL_PROD] >> rpt strip_tac >>
-           first_x_assum irule >- simp[] >>
+           first_assum irule >- simp[] >>
            simp_tac (srw_ss() ++ ETA_ss) [] >>
            qcase_tac `LIST_REL (val_rel (:'ffi) j _) E1 _` >>
            qcase_tac `exec_rel j _ (Exp [e1] E1, s1')` >>
            qcase_tac `exec_rel j _ _ (Exp [e3] E3, s3')` >>
            qcase_tac `exec_rel _ _ (Exp [e1] _, _) (Exp [e2] _, _)` >>
            map_every qexists_tac [`e2`, `E3`, `s3'`] >> simp[] >>
-           first_x_assum irule >> simp[val_rel_refl, state_rel_refl]) >>
+           first_x_assum irule >> simp[val_rel_refl] >>
+           reverse (irule state_rel_refl2)
+           >- metis_tac []
+           >> qexists_tac `i`
+           >> srw_tac [] []
+           >- metis_tac []
+           ) >>
        metis_tac[])
   ));
 
 val exp_rel_trans = Q.store_thm ("exp_rel_trans",
 `!e1 e2 e3. exp_rel (:'ffi) w e1 e2 ∧ exp_rel (:'ffi) w e2 e3 ⇒ exp_rel (:'ffi) w e1 e3`,
  srw_tac[][exp_rel_def] >>
- `!i. state_rel i w s' s' ∧ LIST_REL (val_rel (:'ffi) i w) env' env'` by metis_tac [val_rel_refl, state_rel_refl] >>
+ `state_rel i w s s ∧ LIST_REL (val_rel (:'ffi) i w) env env` by metis_tac [val_rel_refl, state_rel_refl1] >>
  metis_tac [val_rel_trans]);
+
+val state_rel_refl2 = Q.store_thm ("state_rel_refl2",
+ `state_rel j w s1 s2 ⇒ state_rel j w s2 s2`,
+ rw []
+ >> reverse (irule state_rel_refl2)
+ >- metis_tac []
+ >> qexists_tac `j+1`
+ >> rw []
+ >> metis_tac [val_rel_trans]);
 
 val _ = export_theory ();
