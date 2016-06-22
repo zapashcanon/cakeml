@@ -62,6 +62,11 @@ val OPTREL_Cong = Q.store_thm(
 val _ = Datatype `
   world = <| code_restr : (num |-> num # num # closLang$exp)|>`;
 
+val clo_to_exp_def = Define `
+  (clo_to_exp (Closure _ _ _ _ e) = SOME e) ∧
+  (clo_to_exp (Recclosure _ _ _ funs n) = SOME (SND (EL n funs))) ∧
+  (clo_to_exp _ = NONE)`;
+
 val val_rel_def = tDefine "val_rel" `
 (val_rel (:'ffi) (i:num) w (Number n) (Number n') ⇔
   n = n') ∧
@@ -72,6 +77,10 @@ val val_rel_def = tDefine "val_rel" `
 (val_rel (:'ffi) (i:num) w (RefPtr p) (RefPtr p') ⇔ p = p') ∧
 (val_rel (:'ffi) (i:num) w cl cl' ⇔
   if is_closure cl ∧ is_closure cl' ∧ check_closures cl cl' then
+    (!l l' n e. clo_to_loc cl = SOME l ∧ FLOOKUP w.code_restr l = SOME (l',n,e) ⇒
+      closed_exp_rel (:'ffi) i w n [e] [THE (clo_to_exp cl)]) ∧
+    (!l l' n e. clo_to_loc cl' = SOME l ∧ FLOOKUP w.code_restr l = SOME (l',n,e) ⇒
+      closed_exp_rel (:'ffi) i w n [e] [THE (clo_to_exp cl')]) ∧
     !i' vs vs' (s:'ffi closSem$state) (s':'ffi closSem$state) locopt.
       if i' < i then
         state_rel i' w s s' ∧
@@ -100,6 +109,16 @@ val val_rel_def = tDefine "val_rel" `
         T
   else
     F) ∧
+(closed_exp_rel (:'ffi) i w n e1 e2 ⇔
+  !i' env env' s s'.
+    if i' < i then
+      state_rel i' w s s' ∧
+      LENGTH env = n ∧
+      LIST_REL (val_rel (:'ffi) i' w) env env'
+      ⇒
+      exec_rel i' w (Exp e1 env, s) (Exp e2 env', s')
+    else
+      T) ∧
 (exec_rel i w (x:val_or_exp, (s:'ffi closSem$state)) (x':val_or_exp, (s':'ffi closSem$state)) ⇔
   !i'.
     if i' ≤ i then
@@ -129,33 +148,24 @@ val val_rel_def = tDefine "val_rel" `
   fmap_rel (ref_v_rel (:'ffi) i w) s.refs s'.refs ∧
   FEVERY (\(l,(l',n,e)).
             ?e'. FLOOKUP s.code l' = SOME (n, e') ∧
-            !i' env env' s s'.
-               if i' < i then
-                 state_rel i' w s s' ∧
-                 LIST_REL (val_rel (:'ffi) i' w) env env'
-                 ⇒
-                 exec_rel i' w (Exp [e] env, s) (Exp [e'] env', s')
-               else
-                 T)
+            closed_exp_rel (:'ffi) i w n [e] [e'])
+         w.code_restr ∧
+  FEVERY (\(l,(l',n,e)).
+            ?e'. FLOOKUP s'.code l' = SOME (n, e') ∧
+            closed_exp_rel (:'ffi) i w n [e] [e'])
          w.code_restr ∧
   fmap_rel (λ(n,e) (n',e').
              n = n' ∧
-             !i' env env' s s'.
-               if i' < i then
-                 state_rel i' w s s' ∧
-                 LIST_REL (val_rel (:'ffi) i' w) env env'
-                 ⇒
-                 exec_rel i' w (Exp [e] env, s) (Exp [e'] env', s')
-               else
-                 T)
+             closed_exp_rel (:'ffi) i w n [e] [e'])
            s.code s'.code ∧
   s.ffi = s'.ffi)`
 (WF_REL_TAC `inv_image ($< LEX $< LEX $<)
              \x. case x of
-                     | INL (_,i,_,v,v') => (i:num,0:num,v_size v)
-                     | INR (INL (i,_,st,st')) => (i,3,0)
-                     | INR (INR (INL (_,i,_,rv,rv'))) => (i,1,0)
-                     | INR (INR (INR (i,_,s,s'))) => (i,2,0)` >>
+                     | INL (_,i,_,v,v') => (i:num,1:num,v_size v)
+                     | INR (INL (_,i,_,_,_,_)) => (i,0,0)
+                     | INR (INR (INL (i,_,st,st'))) => (i,4,0)
+                     | INR (INR (INR (INL (_,i,_,rv,rv')))) => (i,2,0)
+                     | INR (INR (INR (INR (i,_,s,s')))) => (i,3,0)` >>
  srw_tac[][] >>
  rpt (first_x_assum (mp_tac o GSYM)) >>
  srw_tac[][] >>
@@ -246,18 +256,21 @@ val val_rel_rw =
 
 val _ = save_thm ("val_rel_rw", val_rel_rw);
 
+val closed_exp_rel_rw =
+  let val clauses = CONJUNCTS val_rel_def
+      fun good_const x = same_const ``closed_exp_rel`` x
+  in
+    SIMP_RULE (srw_ss()) [fun_lemma, AND_IMP_INTRO, is_closure_def]
+        (LIST_CONJ (List.filter (find_clause good_const) clauses))
+  end;
+
+val _ = save_thm ("closed_exp_rel_rw", closed_exp_rel_rw);
+
 val state_ok_def = Define `
   state_ok i w (s : 'ffi closSem$state) ⇔
   FEVERY (\(l,(l',n,e)).
             ?e'. FLOOKUP s.code l' = SOME (n, e') ∧
-            !i' env env' s s'.
-               if i' < i then
-                 state_rel i' w (s : 'ffi closSem$state) s' ∧
-                 LIST_REL (val_rel (:'ffi) i' w) env env'
-                 ⇒
-                 exec_rel i' w (Exp [e] env, s) (Exp [e'] env', s')
-               else
-                 T)
+            closed_exp_rel (:'ffi) i w n [e] [e'])
          w.code_restr`;
 
 val state_rel_rw =
@@ -306,13 +319,17 @@ val val_rel_cl_rw = Q.store_thm ("val_rel_cl_rw",
   ⇒
   (val_rel (:'ffi) c w v v' ⇔
     if is_closure v' ∧ check_closures v v' then
-    !i' vs vs' (s:'ffi closSem$state) s' locopt.
-      if i' < c then
-        state_rel i' w s s' ∧
-        vs ≠ [] ∧
-        LIST_REL (val_rel (:'ffi) i' w) vs vs'
-        ⇒
-        case (dest_closure locopt v vs, dest_closure locopt v' vs') of
+      (!l l' n e. clo_to_loc v = SOME l ∧ FLOOKUP w.code_restr l = SOME (l',n,e) ⇒
+        closed_exp_rel (:'ffi) c w n [e] [THE (clo_to_exp v)]) ∧
+      (!l l' n e. clo_to_loc v' = SOME l ∧ FLOOKUP w.code_restr l = SOME (l',n,e) ⇒
+        closed_exp_rel (:'ffi) c w n [e] [THE (clo_to_exp v')]) ∧
+      !i' vs vs' (s:'ffi closSem$state) s' locopt.
+        if i' < c then
+          state_rel i' w s s' ∧
+          vs ≠ [] ∧
+          LIST_REL (val_rel (:'ffi) i' w) vs vs'
+          ⇒
+          case (dest_closure locopt v vs, dest_closure locopt v' vs') of
            | (NONE, _) => T
            | (_, NONE) => F
            | (SOME (Partial_app v), SOME (Partial_app v')) =>
@@ -337,10 +354,16 @@ val val_rel_cl_rw = Q.store_thm ("val_rel_cl_rw",
  Cases_on `v` >>
  Cases_on `v'` >>
  full_simp_tac(srw_ss())[val_rel_rw, is_closure_def] >>
+ eq_tac >>
+ rw [] >>
+ rename1 `clo_loc = SOME _` >>
+ Cases_on `clo_loc` >>
+ fs [] >>
  metis_tac []);
 
 val val_rel_mono = Q.store_thm ("val_rel_mono",
 `(!(ffi:'ffi itself) i w v v'. val_rel ffi i w v v' ⇒ ∀i'. i' ≤ i ⇒ val_rel ffi i' w v v') ∧
+ (!(ffi:'ffi itself) i w n es es'. closed_exp_rel ffi i w n es es' ⇒ !i'. i' ≤ i ⇒ closed_exp_rel ffi i' w n es es') ∧
  (!i w (st:val_or_exp # 'ffi closSem$state) st'. exec_rel i w st st' ⇒ !i'. i' ≤ i ⇒ exec_rel i' w st st') ∧
  (!(ffi:'ffi itself) i w rv rv'. ref_v_rel ffi i w rv rv' ⇒ !i'. i' ≤ i ⇒ ref_v_rel ffi i' w rv rv') ∧
  (!i w (s:'ffi closSem$state) s'. state_rel i w s s' ⇒ !i'. i' ≤ i ⇒ state_rel i' w s s')`,
@@ -355,6 +378,7 @@ val val_rel_mono = Q.store_thm ("val_rel_mono",
      simp [])
  >- (first_x_assum match_mp_tac >>
      simp [])
+ >- fs [closed_exp_rel_rw]
  >- (first_x_assum match_mp_tac >>
      simp [])
  >- full_simp_tac(srw_ss())[state_rel_rw]
@@ -374,6 +398,11 @@ val val_rel_mono = Q.store_thm ("val_rel_mono",
          Cases_on `EL idx s1.globals` >> Cases_on `EL idx s2.globals` >>
          simp[OPTREL_def] >> metis_tac [MEM_EL])
      >- metis_tac [fmap_rel_mono]
+     >- (fs [state_ok_def, FEVERY_DEF] >>
+         rw [] >>
+         res_tac >>
+         pairarg_tac >>
+         fs [])
      >- (fs [state_ok_def, FEVERY_DEF] >>
          rw [] >>
          res_tac >>
@@ -426,13 +455,16 @@ val find_code_related = Q.store_thm ("find_code_related",
  Cases_on `FLOOKUP s.code n` >>
  full_simp_tac(srw_ss())[OPTREL_SOME] >>
  srw_tac[][] >>
- Cases_on `x` >>
- Cases_on `z` >>
+ pop_assum mp_tac >>
+ pairarg_tac >>
+ simp [] >>
+ pairarg_tac >>
+ rw [] >>
  full_simp_tac(srw_ss())[] >>
  simp [] >>
  srw_tac[][]
  >- metis_tac [LIST_REL_LENGTH] >>
- full_simp_tac(srw_ss())[AND_IMP_INTRO] >>
+ full_simp_tac(srw_ss())[AND_IMP_INTRO, closed_exp_rel_rw] >>
  first_x_assum match_mp_tac >>
  simp [] >>
  `c-1 ≤ c` by decide_tac >>
@@ -624,7 +656,14 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
      Cases_on `s'.clock < LENGTH vs'` >>
      simp [res_rel_rw, dec_clock_def]
      >- metis_tac [val_rel_mono, ZERO_LESS_EQ]
-     >- (full_simp_tac(srw_ss())[val_rel_cl_rw] >>
+     >- (
+         qpat_assum `val_rel _ _ _ _ _` mp_tac >>
+         qspecl_then [`s'.clock`, `v`, `v'`] mp_tac val_rel_cl_rw >>
+         disch_then drule >>
+         strip_tac >>
+         simp [] >>
+         pop_assum kall_tac >>
+         strip_tac >>
          `s'.clock - LENGTH vs ≤ s'.clock` by decide_tac >>
          first_x_assum
            (qspecl_then [`s'.clock - 1`, `vs`, `vs'`, `s`, `s'`, `NONE`]
@@ -635,6 +674,7 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
           LIST_REL (val_rel (:'ffi) (s'.clock − 1) w) vs vs'`
            by metis_tac [val_rel_mono, val_rel_mono_list] >>
          simp [] >>
+         fs [] >>
          disch_then (qspec_then `s'.clock - 1` mp_tac) >>
          simp [res_rel_rw]))
  >- ((* Partial, Full *)
@@ -673,7 +713,8 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
       LIST_REL (val_rel (:'ffi) st.clock w) used used'`
        by metis_tac[EVERY2_APPEND] >>
      qspecl_then [`st.clock`, `v`, `v'`] mp_tac val_rel_cl_rw >> simp[] >>
-     disch_then
+     strip_tac >>
+     pop_assum
        (qspecl_then [`st.clock - 1`, `used`, `used'`] mp_tac) >>
      simp[] >>
      rename1 `state_rel _ _ s0 s0'` >>
@@ -745,7 +786,8 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
       LIST_REL (val_rel (:'ffi) st.clock w) used used'`
        by metis_tac[EVERY2_APPEND] >>
      qspecl_then [`st.clock`, `v`, `v'`] mp_tac val_rel_cl_rw >> simp[] >>
-     disch_then
+     strip_tac >>
+     pop_assum
        (qspecl_then [`st.clock - 1`, `used`, `used'`] mp_tac) >>
      simp[] >>
      rename1 `state_rel _ _ s0 s0'` >>
@@ -803,8 +845,13 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
           LIST_REL (val_rel (:'ffi) s'.clock w) used1 used2`
            by metis_tac[EVERY2_APPEND, LENGTH_APPEND] >>
          Q.UNDISCH_THEN `val_rel (:'ffi) s'.clock w v v'` mp_tac >>
-         simp[val_rel_cl_rw] >>
-         disch_then
+         qspecl_then [`s'.clock`, `v`, `v'`] mp_tac val_rel_cl_rw >>
+         disch_then drule >>
+         strip_tac >>
+         simp [] >>
+         pop_assum kall_tac >>
+         strip_tac >>
+         pop_assum
            (qspecl_then [`s'.clock - 1`, `used1`, `used2`, `s`, `s'`, `loc`]
                         mp_tac) >> simp[] >>
          `s'.clock - 1 ≤ s'.clock` by decide_tac >>
@@ -863,7 +910,8 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
           LIST_REL (val_rel (:'ffi) s'.clock w) used1 usfx2`
             by metis_tac[LENGTH_APPEND, EVERY2_APPEND, APPEND_ASSOC] >>
          qspecl_then [`s'.clock`, `v`, `v'`] mp_tac val_rel_cl_rw >> simp[] >>
-         disch_then (qspecl_then [`s'.clock - 1`, `used1`, `usfx2`,
+         strip_tac >>
+         pop_assum (qspecl_then [`s'.clock - 1`, `used1`, `usfx2`,
                                   `s`, `s'`, `NONE`]
                                  mp_tac) >> simp[] >>
          `state_rel (s'.clock - 1) w s s'`
@@ -936,7 +984,8 @@ val res_rel_evaluate_app = Q.store_thm ("res_rel_evaluate_app",
           LIST_REL (val_rel (:'ffi) s'.clock w) usfx1 used2`
             by metis_tac[LENGTH_APPEND, EVERY2_APPEND, APPEND_ASSOC] >>
          qspecl_then [`s'.clock`, `v`, `v'`] mp_tac val_rel_cl_rw >> simp[] >>
-         disch_then (qspecl_then [`s'.clock - 1`, `usfx1`, `used2`,
+         strip_tac >>
+         pop_assum (qspecl_then [`s'.clock - 1`, `usfx1`, `used2`,
                                   `s`, `s'`, `NONE`]
                                  mp_tac) >> simp[] >>
          `state_rel (s'.clock - 1) w s s'`
@@ -1761,19 +1810,23 @@ val compat_closure_none = Q.prove (
 
 val compat_closure_some = Q.prove (
 `!i l env env' args args' num_args e e'.
+  (!l' n e''.
+    FLOOKUP w.code_restr l = SOME (l',n,e'') ⇒
+    closed_exp_rel (:'ffi) i w n [e''] [e] ∧
+    closed_exp_rel (:'ffi) i w n [e''] [e']) ∧
   LIST_REL (val_rel (:'ffi) i w) env env' ∧
   LIST_REL (val_rel (:'ffi) i w) args args' ∧
   exp_rel (:'ffi) w [e] [e']
   ⇒
   val_rel (:'ffi) i w (Closure (SOME l) args env num_args e) (Closure (SOME l) args' env' num_args e')`,
  completeInduct_on `i` >>
- srw_tac[][val_rel_rw, is_closure_def] >>
+ srw_tac[][val_rel_rw, is_closure_def, clo_to_exp_def] >>
  imp_res_tac LIST_REL_LENGTH
  >- (
    srw_tac[][check_closures_def, clo_can_apply_def, clo_to_num_params_def,
        clo_to_partial_args_def, rec_clo_ok_def, clo_to_loc_def] >>
-   full_simp_tac(srw_ss())[]) >>
- `(?l. locopt = SOME l) ∨ locopt = NONE` by metis_tac [option_nchotomy]
+   full_simp_tac(srw_ss())[])
+ >> `(?l. locopt = SOME l) ∨ locopt = NONE` by metis_tac [option_nchotomy]
  >- (
    simp [dest_closure_def, check_loc_def] >>
    srw_tac[][] >>
@@ -1862,7 +1915,7 @@ val compat_closure_some = Q.prove (
    first_x_assum (match_mp_tac o SIMP_RULE (srw_ss()) [PULL_FORALL, AND_IMP_INTRO]) >>
    simp [] >>
    `i'' - (LENGTH vs' - 1) ≤ i ∧ i'' - (LENGTH vs' - 1) ≤ i'` by decide_tac >>
-   metis_tac [val_rel_mono_list, EVERY2_APPEND])
+   metis_tac [val_rel_mono_list, EVERY2_APPEND, val_rel_mono])
  >- (
    `i'' − (LENGTH vs' − 1) ≤ i'` by decide_tac >>
    metis_tac [val_rel_mono])
@@ -1870,6 +1923,11 @@ val compat_closure_some = Q.prove (
 
 val compat_closure = Q.store_thm ("compat_closure",
 `!i l env env' args args' num_args e e'.
+ (!l' l'' n e''.
+    l = SOME l'' ∧
+    FLOOKUP w.code_restr l'' = SOME (l',n,e'') ⇒
+    closed_exp_rel (:'ffi) i w n [e''] [e] ∧
+    closed_exp_rel (:'ffi) i w n [e''] [e']) ∧
  LIST_REL (val_rel (:'ffi) i w) env env' ∧
  LIST_REL (val_rel (:'ffi) i w) args args' ∧
  exp_rel (:'ffi) w [e] [e']
@@ -1877,10 +1935,16 @@ val compat_closure = Q.store_thm ("compat_closure",
  val_rel (:'ffi) i w (Closure l args env num_args e) (Closure l args' env' num_args e')`,
  srw_tac[][] >>
  Cases_on `l` >>
- metis_tac [compat_closure_some, compat_closure_none]);
+ fs [] >>
+ metis_tac [compat_closure_none, compat_closure_some]);
 
 val compat_fn = Q.store_thm ("compat_fn",
 `!vars num_args e e' loc.
+  (!i l' l'' n e''.
+    loc = SOME l'' ∧
+    FLOOKUP w.code_restr l'' = SOME (l',n,e'') ⇒
+    closed_exp_rel (:'ffi) i w n [e''] [e] ∧
+    closed_exp_rel (:'ffi) i w n [e''] [e']) ∧
   exp_rel (:'ffi) w [e] [e']
   ⇒
   exp_rel (:'ffi) w [Fn loc vars num_args e] [Fn loc vars num_args e']`,
@@ -1888,12 +1952,17 @@ val compat_fn = Q.store_thm ("compat_fn",
  srw_tac[][exp_rel_def] >>
  simp [exec_rel_rw, evaluate_def, evaluate_ev_def] >>
  srw_tac[][res_rel_rw] >>
+ first_x_assum (qspec_then `i'` assume_tac) >>
+ drule compat_closure >>
+ rw [] >>
  Cases_on `vars` >>
  full_simp_tac(srw_ss())[]
  >- (
    reverse (srw_tac[][res_rel_rw])
    >- metis_tac [val_rel_mono] >>
-   metis_tac [compat_closure, val_rel_mono_list, LIST_REL_NIL])
+   irule compat_closure >>
+   rw []
+   >> metis_tac [val_rel_mono_list, LIST_REL_NIL])
  >- (
    Cases_on `lookup_vars x env` >>
    full_simp_tac(srw_ss())[res_rel_rw] >>
@@ -1914,6 +1983,7 @@ val exp_rel_sing =
     exp_rel_def |> Q.SPECL [`w`, `[e1]`, `[e2]`]
                 |> SIMP_RULE (srw_ss()) [exec_rel_rw, evaluate_ev_def]
 
+                (*
 val compat_recclosure = Q.store_thm ("compat_recclosure",
 `!i l env env' args args' funs funs' idx.
   LIST_REL (λ(n,e) (n',e'). n = n' ∧ exp_rel (:'ffi) w [e] [e']) funs funs' ∧
@@ -2073,6 +2143,7 @@ val compat_letrec = Q.store_thm ("compat_letrec",
      srw_tac[][exp_rel_def] >>
      metis_tac [val_rel_mono_list]) >>
    full_simp_tac(srw_ss())[exec_rel_rw, evaluate_ev_def]));
+   *)
 
 val compat_op = Q.store_thm ("compat_op",
 `!op es es'.
@@ -2100,17 +2171,45 @@ val compat_op = Q.store_thm ("compat_op",
 val compat = save_thm ("compat",
   LIST_CONJ [compat_nil, compat_cons, compat_var, compat_if, compat_let, compat_raise,
              compat_handle, compat_tick, compat_call, compat_app,
-             compat_fn, compat_letrec, compat_op]);
+             compat_fn, (*compat_letrec,*) compat_op]);
+
+val exps_ok_def = tDefine "exps_ok" `
+  (exps_ok (:'ffi) w [] ⇔ T) ∧
+  (exps_ok (:'ffi) w (x::y::xs) ⇔ exps_ok (:'ffi) w [x] ∧ exps_ok (:'ffi) w (y::xs)) ∧
+  (exps_ok (:'ffi) w [Var n] ⇔ T) ∧
+  (exps_ok (:'ffi) w [If x1 x2 x3] ⇔
+    exps_ok (:'ffi) w [x1] ∧ exps_ok (:'ffi) w [x2] ∧ exps_ok (:'ffi) w [x3]) ∧
+  (exps_ok (:'ffi) w [Let xs x2] ⇔ exps_ok (:'ffi) w xs ∧ exps_ok (:'ffi) w [x2]) ∧
+  (exps_ok (:'ffi) w [Raise x1] ⇔ exps_ok (:'ffi) w [x1]) ∧
+  (exps_ok (:'ffi) w [Handle x1 x2] ⇔ exps_ok (:'ffi) w [x1] ∧ exps_ok (:'ffi) w [x2]) ∧
+  (exps_ok (:'ffi) w [Op op xs] ⇔ exps_ok (:'ffi) w xs) ∧
+  (exps_ok (:'ffi) w [Fn loc vsopt num_args exp] ⇔
+    (!i l' l'' n e'.
+      loc = SOME l'' ∧
+      FLOOKUP w.code_restr l'' = SOME (l',n,e') ⇒
+      closed_exp_rel (:'ffi) i w n [e'] [exp]) ∧
+    exps_ok (:'ffi) w [exp]) ∧
+  (exps_ok (:'ffi) w [Letrec loc namesopt fns exp] ⇔ F) ∧
+  (exps_ok (:'ffi) w [App loc_opt x1 args] ⇔
+    exps_ok (:'ffi) w [x1] ∧ exps_ok (:'ffi) w args) ∧
+  (exps_ok (:'ffi) w [Tick x] ⇔ exps_ok (:'ffi) w [x]) ∧
+  (exps_ok (:'ffi) w [Call dest xs] ⇔ exps_ok (:'ffi) w xs)`
+ cheat;
+
+val exps_ok_CONS = Q.store_thm("exps_ok_CONS",
+  `exps_ok (:'ffi) w (x::xs) ⇔ exps_ok (:'ffi) w [x] ∧ exps_ok (:'ffi) w xs`,
+  Cases_on `xs` >>
+  fs [exps_ok_def]);
 
 val exp_rel_refl = Q.store_thm ("exp_rel_refl",
-`(!e. exp_rel (:'ffi) w [e] [e]) ∧
- (!es. exp_rel (:'ffi) w es es) ∧
- (!(ne :num # closLang$exp). FST ne = FST ne ∧ exp_rel (:'ffi) w [SND ne] [SND ne]) ∧
- (!funs. LIST_REL (\(n:num,e) (n',e'). n = n' ∧ exp_rel (:'ffi) w [e] [e']) funs funs)`,
+`(!e. exps_ok (:'ffi) w [e] ⇒ exp_rel (:'ffi) w [e] [e]) ∧
+ (!es. exps_ok (:'ffi) w es ⇒ exp_rel (:'ffi) w es es) ∧
+ (!(ne :num # closLang$exp). exps_ok (:'ffi) w [SND ne] ⇒ FST ne = FST ne ∧ exp_rel (:'ffi) w [SND ne] [SND ne]) ∧
+ (!funs. LIST_REL (\(n:num,e) (n',e'). exps_ok (:'ffi) w [e] ∧ exps_ok (:'ffi) w [e'] ⇒  n = n' ∧ exp_rel (:'ffi) w [e] [e']) funs funs)`,
  Induct >>
- srw_tac[][] >>
+ srw_tac[][exps_ok_def] >>
  TRY (PairCases_on `ne`) >>
- full_simp_tac(srw_ss())[] >>
+ full_simp_tac(srw_ss())[Once exps_ok_CONS] >>
  metis_tac [compat]);
 
 val val_rel_refl = Q.store_thm ("val_rel_refl",
@@ -2184,39 +2283,10 @@ val state_rel_refl1 = Q.store_thm ("state_rel_refl1",
  >> fs [Once state_rel_rw]);
 
 val state_rel_refl2 = Q.store_thm ("state_rel_refl2",
-  `!i j w (s1:'ffi closSem$state) s2.
-    (∀i' (s'':'ffi closSem$state) s''' env env' e e'.
-      i' < i ∧ state_rel i' w s'' s''' ∧
-       LIST_REL (λa' a. val_rel (:'ffi) i' w a' a) env env' ∧
-       exec_rel i' w (Exp [e] env,s'') (Exp [e'] env',s''') ⇒
-         !st3. exec_rel i' w (Exp [e'] env',s''') st3 ⇒
-         exec_rel i' w (Exp [e] env,s'') st3)
-   ⇒
-   j < i ∧ state_rel j w s1 s2 ⇒ state_rel j w s2 s2`,
+  `state_rel i w s1 s2 ⇒ state_rel i w s2 s2`,
  rw []
  >> match_mp_tac state_rel_refl
- >> pop_assum mp_tac
- >> ONCE_REWRITE_TAC [state_rel_rw]
- >> rw [state_ok_def, FEVERY_DEF]
- >> pairarg_tac
- >> fs []
- >> first_x_assum drule
- >> rw []
- >> fs [fmap_rel_def, FLOOKUP_DEF]
- >> first_x_assum drule
- >> pairarg_tac
- >> fs []
- >> pairarg_tac
- >> fs []
- >> rw []
- >> `i' < i` by decide_tac
- >> imp_res_tac state_rel_refl1
- >> first_x_assum irule
- >- decide_tac
- >> qexists_tac `e'`
- >> qexists_tac `env`
- >> qexists_tac `s`
- >> simp [val_rel_refl, refl_list_rel_refl]);
+ >> fs [Once state_rel_rw]);
 
 val val_rel_trans = Q.store_thm ("val_rel_trans",
 `(!(ffi:'ffi itself) i w v1 v2.
@@ -2276,8 +2346,7 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp_tac (srw_ss()) [val_rel_rw, optCASE_NONE_F, optCASE_NONE_T] >>
   conj_tac >- metis_tac[check_closures_trans] >>
   qx_genl_tac [`j`, `vs1`, `vs2`, `s1`, `s2`, `clocopt`] >> strip_tac >>
-  `state_rel j w s2 s2`
-    by (irule state_rel_refl2 >> cheat) >>
+  `state_rel j w s2 s2` by metis_tac [state_rel_refl2] >>
   rpt (first_x_assum (qspecl_then [`j`, `s1`, `s2`]
                         (fn th => mp_tac th >>
                                   simp[SimpL ``$==>``] >>
@@ -2295,7 +2364,6 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp[SimpL ``$==>``, optCASE_NONE_F] >>
   disch_then (qx_choose_then `dcres2` mp_tac) >>
   `vs2 ≠ []` by (strip_tac >> full_simp_tac(srw_ss())[]) >>
-
   Cases_on `dcres` >> Cases_on `dcres2` >> simp[SimpL ``$==>``] >>
   disch_then (fn th => RULE_ASSUM_TAC (SIMP_RULE (srw_ss()) [th]) >>
                        strip_assume_tac th) >>
@@ -2334,7 +2402,7 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp_tac (srw_ss()) [val_rel_rw, optCASE_NONE_F, optCASE_NONE_T] >>
   conj_tac >- metis_tac[check_closures_trans] >>
   qx_genl_tac [`j`, `vs1`, `vs2`, `s1`, `s2`, `clocopt`] >> strip_tac >>
-  `state_rel j w s2 s2` by cheat >>
+  `state_rel j w s2 s2` by metis_tac [state_rel_refl2] >>
   rpt (first_x_assum (qspecl_then [`j`, `s1`, `s2`]
                         (fn th => mp_tac th >>
                                   simp[SimpL ``$==>``] >>
@@ -2377,21 +2445,17 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
   simp[exec_rel_rw] >> qx_gen_tac `j` >> strip_tac >>
   Q.UNDISCH_THEN `exec_rel i w (e0,s0) (e1,s1)` mp_tac >>
   simp[exec_rel_rw] >> disch_then strip_assume_tac >>
-
   rpt (first_x_assum (mp_tac o
                       C (PART_MATCH' (hd o strip_conj o #1 o dest_imp))
                         ``j:num ≤ i``) >>
        simp[] >> strip_tac) >>
-
   `∃r0 s0'. evaluate_ev j e0 s0 = (r0,s0')`
     by (Cases_on `evaluate_ev j e0 s0` >> simp[]) >> full_simp_tac(srw_ss())[] >>
   `∃r1 s1'. evaluate_ev j e1 s1 = (r1,s1')`
     by (Cases_on `evaluate_ev j e1 s1` >> simp[]) >> full_simp_tac(srw_ss())[] >>
-
   qpat_assum `exec_rel i _ (e1,s1) _` mp_tac >>
   simp[exec_rel_rw] >> disch_then (qspec_then `j` mp_tac) >> simp[] >>
   strip_tac >>
-
   reverse (Cases_on `r0`) >> full_simp_tac(srw_ss())[]
   >- (rename1 `evaluate_ev _ _ s0 = (Rerr ee, _)` >>
       reverse (Cases_on `ee`) >> full_simp_tac(srw_ss())[]
@@ -2437,12 +2501,7 @@ val val_rel_trans = Q.store_thm ("val_rel_trans",
            rename1 `exec_rel _ _ (Exp [e1] _, _) (Exp [e2] _, _)` >>
            map_every qexists_tac [`e2`, `E3`, `s3'`] >> simp[] >>
            first_x_assum irule >> simp[val_rel_refl] >>
-           reverse (irule state_rel_refl2)
-           >- metis_tac []
-           >> qexists_tac `i`
-           >> srw_tac [] []
-           >- metis_tac []
-           ) >>
+           metis_tac [state_rel_refl2]) >>
        metis_tac[])
   ));
 
@@ -2451,14 +2510,5 @@ val exp_rel_trans = Q.store_thm ("exp_rel_trans",
  srw_tac[][exp_rel_def] >>
  `state_rel i w s s ∧ LIST_REL (val_rel (:'ffi) i w) env env` by metis_tac [val_rel_refl, state_rel_refl1] >>
  metis_tac [val_rel_trans]);
-
-val state_rel_refl2 = Q.store_thm ("state_rel_refl2",
- `state_rel j w s1 s2 ⇒ state_rel j w s2 s2`,
- rw []
- >> reverse (irule state_rel_refl2)
- >- metis_tac []
- >> qexists_tac `j+1`
- >> rw []
- >> metis_tac [val_rel_trans]);
 
 val _ = export_theory ();

@@ -289,8 +289,8 @@ val exp_rel_rtc_semantics_lem = Q.prove (
     ∀(s1:'ffi closSem$state) s2.
       (∀i. state_rel i w s1 s2) ∧ ¬(semantics [] s1 e1 = Fail) ⇒
        semantics [] s1 e1 = semantics [] s2 e2`,
- ho_match_mp_tac RTC_INDUCT >>
- metis_tac [exp_rel_semantics, state_rel_refl, exp_rel_refl]);
+ ho_match_mp_tac RTC_INDUCT
+ >> metis_tac [exp_rel_semantics, exp_rel_refl, state_rel_refl2]);
 
 val exp_rel_rtc_semantics = Q.store_thm(
   "exp_rel_rtc_semantics",
@@ -802,11 +802,57 @@ val exp_rel_thm = save_thm(
       |> SIMP_RULE (srw_ss() ++ DNF_ss) [exec_rel_rw, evaluate_ev_def,
                                          AND_IMP_INTRO]);
 
+val w_ok_def = Define `
+  w_ok w ⇔
+    !l l1 n1 e1 l2 n2 e2.
+      FLOOKUP w.code_restr l1 = SOME (l,n1,e1) ∧
+      FLOOKUP w.code_restr l2 = SOME (l,n2,e2)
+      ⇒
+      n1 = n2 ∧
+      e1 = e2`;
+
+val exists_ok_state = Q.store_thm ("exists_ok_state",
+  `!w i. w_ok w ⇒ ∃(s:'ffi closSem$state). state_ok i w s`,
+  rw [state_ok_def, FEVERY_DEF]
+  >> qexists_tac
+       `<| globals := ARB; refs := ARB; clock := ARB; ffi := ARB;
+           code := FUN_FMAP (\l. (@t. (l,t) ∈ (FRANGE w.code_restr))) (IMAGE FST (FRANGE w.code_restr))
+           |>`
+  >> rw []
+  >> pairarg_tac
+  >> simp [FLOOKUP_FUN_FMAP]
+  >> qexists_tac `e`
+  >> conj_tac
+  >- (
+    conj_asm1_tac
+    >- (
+      qexists_tac `(l',n,e)`
+      >> rw [IN_FRANGE]
+      >> metis_tac [])
+    >> irule SELECT_UNIQUE
+    >> strip_tac
+    >> eq_tac
+    >> rw []
+    >- (
+      PairCases_on `x'`
+      >> fs []
+      >> PairCases_on `y`
+      >> fs [w_ok_def, IN_FRANGE, FLOOKUP_DEF]
+      >> res_tac
+      >> rw [])
+    >> fs [IN_FRANGE]
+    >> metis_tac [])
+  >> rw []
+  >> `exp_rel (:'ffi) w [e] [e]` by metis_tac [exp_rel_refl]
+  >> fs [exp_rel_def]);
+
 val exp_rel_NIL_CONS = Q.store_thm(
   "exp_rel_NIL_CONS[simp]",
-  `exp_rel (:'ffi) w [] (e::es) ⇔ F`,
+  `w_ok w ⇒ (exp_rel (:'ffi) w [] (e::es) ⇔ F)`,
   simp[exp_rel_thm, evaluate_def] >>
   simp[Once evaluate_CONS, res_rel_rw, pair_case_eq, eqs] >>
+  rw [] >>
+  `?s i. state_ok i w (s : 'ffi closSem$state)` by metis_tac [exists_ok_state] >>
   metis_tac[val_rel_refl, state_rel_refl, DECIDE ``n:num ≤ n``]);
 
 val res_rel_Rerr_Rval = Q.store_thm(
@@ -834,7 +880,7 @@ val res_rel_cases = Q.store_thm(
        s1.clock = s2.clock) ∨
      (∃s1 s2. v1 = (Rerr (Rabort Rtimeout_error), s1) ∧
               v2 = (Rerr (Rabort Rtimeout_error), s2) ∧
-              state_rel s1.clock s1 s2)`,
+              state_rel s1.clock w s1 s2)`,
   Cases_on `v1` >> rename1 `res_rel _ (res1, s1)` >>
   Cases_on `v2` >> rename1 `res_rel _ _ (res2, s2)` >>
   Cases_on `res1` >> simp[] >> Cases_on `res2` >> simp[res_rel_rw]
@@ -858,12 +904,13 @@ val val_rel_bool = Q.store_thm(
   `val_rel (:'ffi) c w (Boolv b) v ⇔ v = Boolv b`,
   Cases_on `v` >> simp[val_rel_rw, Boolv_def] >> metis_tac[]);
 
- `exp_rel (:'ffi) w [f] [f'] ∧
+ `FLOOKUP w.code_restr loc = SOME (loc',n,e) ∧
+  exp_rel (:'ffi) w [f] [f'] ∧
   exp_rel (:'ffi) w es es'
   ⇒
   exp_rel (:'ffi) w
     [App (SOME loc) f es]
-    [Let (es'++[f']) (closLang$Call loc (MAP Var (COUNT_LIST (LENGTH es'))))]`,
+    [Let (es'++[f']) (closLang$Call loc' (MAP Var (COUNT_LIST (LENGTH es'))))]`,
 
   rw [exp_rel_thm]
   >> rw [evaluate_ev_def, evaluate_def]
@@ -886,8 +933,8 @@ val val_rel_bool = Q.store_thm(
   >> imp_res_tac evaluate_SING
   >> fs []
   >> rw []
-  >> qcase_tac `evaluate_app (SOME loc) fval args s3`
-  >> qcase_tac `evaluate (_, args' ++ [fval'] ++ env', s3')`
+  >> rename1 `evaluate_app (SOME loc) fval args s3`
+  >> rename1 `evaluate (_, args' ++ [fval'] ++ env', s3')`
   >> `LENGTH es' = LENGTH args' ∧ LENGTH es = LENGTH args` by cheat
   >> `LENGTH args = LENGTH args'` by metis_tac [LIST_REL_LENGTH, LESS_EQ_REFL]
   >> simp [evaluate_vars]
