@@ -266,8 +266,8 @@ val closed_exp_rel_rw =
 
 val _ = save_thm ("closed_exp_rel_rw", closed_exp_rel_rw);
 
-val state_ok_def = Define `
-  state_ok i w (s : 'ffi closSem$state) ⇔
+val code_table_ok_def = Define `
+  code_table_ok i w (s : 'ffi closSem$state) ⇔
   FEVERY (\(l,(l',n,e)).
             ?e'. FLOOKUP s.code l' = SOME (n, e') ∧
             closed_exp_rel (:'ffi) i w n [e] [e'])
@@ -278,7 +278,7 @@ val state_rel_rw =
       fun good_const x = same_const ``state_rel`` x orelse same_const ``ref_v_rel`` x
   in
     LIST_CONJ (List.filter (find_clause good_const) clauses)
-    |> SIMP_RULE pure_ss [fun_lemma, GSYM state_ok_def]
+    |> SIMP_RULE pure_ss [fun_lemma, GSYM code_table_ok_def]
     |> SIMP_RULE (srw_ss()) []
   end;
 
@@ -398,12 +398,12 @@ val val_rel_mono = Q.store_thm ("val_rel_mono",
          Cases_on `EL idx s1.globals` >> Cases_on `EL idx s2.globals` >>
          simp[OPTREL_def] >> metis_tac [MEM_EL])
      >- metis_tac [fmap_rel_mono]
-     >- (fs [state_ok_def, FEVERY_DEF] >>
+     >- (fs [code_table_ok_def, FEVERY_DEF] >>
          rw [] >>
          res_tac >>
          pairarg_tac >>
          fs [])
-     >- (fs [state_ok_def, FEVERY_DEF] >>
+     >- (fs [code_table_ok_def, FEVERY_DEF] >>
          rw [] >>
          res_tac >>
          pairarg_tac >>
@@ -433,7 +433,7 @@ val state_rel_clock = Q.store_thm ("state_rel_clock[simp]",
   (state_rel w c1 s (s' with clock := c2) ⇔ state_rel w c1 s s')`,
  srw_tac[][] >>
  ONCE_REWRITE_TAC [state_rel_rw] >>
- srw_tac[][state_ok_def]);
+ srw_tac[][code_table_ok_def]);
 
 val find_code_related = Q.store_thm ("find_code_related",
 `!c n vs (s:'ffi closSem$state) args e vs' s'.
@@ -1155,13 +1155,13 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
        srw_tac[][Unit_def, val_rel_rw] >>
        rpt (pop_assum mp_tac) >>
        ONCE_REWRITE_TAC [state_rel_rw] >>
-       srw_tac[][state_ok_def] >>
+       srw_tac[][code_table_ok_def] >>
        srw_tac[][OPTREL_def])
      >- (full_simp_tac(srw_ss())[LET_THM, SWAP_REVERSE_SYM] >>
          full_simp_tac(srw_ss())[val_rel_rw] >>
          `(LEAST ptr. ptr ∉ FDOM s.refs) = LEAST ptr. ptr ∉ FDOM s'.refs`
                 by full_simp_tac(srw_ss())[Once state_rel_rw, fmap_rel_def] >>
-         full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
          match_mp_tac fmap_rel_FUPDATE_same >>
          srw_tac[][ref_v_rel_rw])
      >- ((* global init *)
@@ -1173,7 +1173,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
        full_simp_tac(srw_ss())[OPTREL_def, val_rel_rw, Unit_def] >>
        rpt (pop_assum mp_tac) >>
        ONCE_REWRITE_TAC [state_rel_rw] >>
-       srw_tac[][state_ok_def] >>
+       srw_tac[][code_table_ok_def] >>
        match_mp_tac EVERY2_LUPDATE_same >>
        srw_tac[][OPTREL_SOME])
      >- (
@@ -1208,7 +1208,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
          rveq \\ simp[val_rel_rw] >>
          `(LEAST ptr. ptr ∉ FDOM s.refs) = LEAST ptr. ptr ∉ FDOM s'.refs`
                 by full_simp_tac(srw_ss())[Once state_rel_rw, fmap_rel_def] >>
-         full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
          match_mp_tac fmap_rel_FUPDATE_same >>
          srw_tac[][ref_v_rel_rw, LIST_REL_REPLICATE_same])
      >- (full_simp_tac(srw_ss())[LET_THM, SWAP_REVERSE_SYM] >>
@@ -1217,7 +1217,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
          rveq \\ simp[val_rel_rw] >>
          `(LEAST ptr. ptr ∉ FDOM s.refs) = LEAST ptr. ptr ∉ FDOM s'.refs`
                 by full_simp_tac(srw_ss())[Once state_rel_rw, fmap_rel_def] >>
-         full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
          match_mp_tac fmap_rel_FUPDATE_same >>
          srw_tac[][ref_v_rel_rw, LIST_REL_REPLICATE_same])
      >- (full_simp_tac(srw_ss())[SWAP_REVERSE_SYM] >>
@@ -1237,7 +1237,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
          imp_res_tac state_rel_refs >>
          full_simp_tac(srw_ss())[ref_v_rel_rw] >>
          srw_tac[][val_rel_rw, Unit_def] >>
-         full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
          match_mp_tac fmap_rel_FUPDATE_same >>
          simp [state_rel_rw])
      >- (
@@ -1261,7 +1261,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
          BasicProvers.CASE_TAC \\ fs[val_rel_rw] \\ rfs[] >>
          `(LEAST ptr. ptr ∉ FDOM s.refs) = LEAST ptr. ptr ∉ FDOM s'.refs`
                 by full_simp_tac(srw_ss())[Once state_rel_rw, fmap_rel_def] >>
-         full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
          match_mp_tac fmap_rel_FUPDATE_same >>
          fs[SWAP_REVERSE_SYM] >>
          srw_tac[][ref_v_rel_rw, EVERY2_REVERSE] >>
@@ -1285,7 +1285,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
          imp_res_tac state_rel_refs >>
          full_simp_tac(srw_ss())[ref_v_rel_rw, LIST_REL_EL_EQN] >>
          srw_tac[][val_rel_rw, Unit_def]
-         >- (full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         >- (full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
              match_mp_tac fmap_rel_FUPDATE_same >>
              srw_tac[][ref_v_rel_rw] >>
              match_mp_tac EVERY2_LUPDATE_same >>
@@ -1299,7 +1299,7 @@ val res_rel_do_app = Q.store_thm ("res_rel_do_app",
          srw_tac[][] >>
          `s'.ffi = s.ffi` by full_simp_tac(srw_ss())[Once state_rel_rw] >>
          srw_tac[][Unit_def, val_rel_rw] >>
-         full_simp_tac(srw_ss())[Once state_rel_rw, state_ok_def] >>
+         full_simp_tac(srw_ss())[Once state_rel_rw, code_table_ok_def] >>
          match_mp_tac fmap_rel_FUPDATE_same >>
          srw_tac[][ref_v_rel_rw])
      >- (full_simp_tac(srw_ss())[SWAP_REVERSE_SYM] >>
@@ -2221,6 +2221,10 @@ val vals_ok_def = tDefine "val_ok" `
   (vals_ok (:'ffi) w [Block n vs] ⇔ vals_ok (:'ffi) w vs) ∧
   (vals_ok (:'ffi) w [RefPtr n] ⇔ T) ∧
   (vals_ok (:'ffi) w [Closure l vs vs' n e] ⇔
+    (!i l' l'' n e'.
+      l = SOME l'' ∧
+      FLOOKUP w.code_restr l'' = SOME (l',n,e') ⇒
+      closed_exp_rel (:'ffi) i w n [e'] [e]) ∧
     vals_ok (:'ffi) w vs ∧
     vals_ok (:'ffi) w vs' ∧
     exps_ok (:'ffi) w [e]) ∧
@@ -2245,29 +2249,56 @@ val val_rel_refl = Q.store_thm ("val_rel_refl",
  >> (
    irule compat_closure
    >> simp []
-   >- (
-     rw []
-     >> fs [exps_ok_def]
-   >- metis_tac [exp_rel_refl]
+   >> metis_tac [exp_rel_refl]));
+
+val ref_v_ok_def = Define `
+  (ref_v_ok (:'ffi) w (ByteArray ws) ⇔ T) ∧
+  (ref_v_ok (:'ffi) w (ValueArray vs) ⇔ vals_ok (:'ffi) w vs)`;
 
 val ref_v_rel_refl = Q.store_thm ("ref_v_rel_refl",
-`!i rv. ref_v_rel (:'ffi) i w rv rv`,
+`!i rv. ref_v_ok (:'ffi) w rv ⇒ ref_v_rel (:'ffi) i w rv rv`,
  srw_tac[][] >>
  Cases_on `rv` >>
- srw_tac[][ref_v_rel_rw] >>
+ fs [ref_v_rel_rw, ref_v_ok_def] >>
  metis_tac [val_rel_refl, refl_list_rel_refl]);
 
+val state_ok_def = Define `
+  state_ok w (s : 'ffi closSem$state) ⇔
+    FEVERY (\(_,rv). ref_v_ok (:'ffi) w rv) s.refs ∧
+    EVERY (\v. case v of NONE => T | SOME v => vals_ok (:'ffi) w [v]) s.globals ∧
+    FEVERY (λ(l,(n,e)). exps_ok (:'ffi) w [e]) s.code ∧
+    !i. code_table_ok i w s`;
+
 val state_rel_refl = Q.store_thm ("state_rel_refl",
-`(!i s. state_ok i w s ⇒ state_rel i w s s)`,
- srw_tac[][Once state_rel_rw]
- >- metis_tac [refl_list_rel_refl, val_rel_refl, OPTREL_refl]
- >- metis_tac [fmap_rel_refl, ref_v_rel_refl]
+`!s. state_ok w s ⇒ state_rel i w s s`,
+ srw_tac[][Once state_rel_rw, state_ok_def]
  >- (
-   match_mp_tac fmap_rel_refl >>
-   simp [FORALL_PROD] >>
-   srw_tac[][] >>
-   `exp_rel (:'a) w [p_2] [p_2]` by metis_tac [exp_rel_refl] >>
-   full_simp_tac(srw_ss())[exp_rel_def]));
+   match_mp_tac EVERY2_refl >>
+   rw [] >>
+   fs [EVERY_MEM] >>
+   first_x_assum drule >>
+   CASE_TAC >>
+   rw [OPTREL_def] >>
+   metis_tac [val_rel_refl])
+ >- (
+   rw [fmap_rel_OPTREL_FLOOKUP, OPTREL_def]
+   >> Cases_on `FLOOKUP s.refs k`
+   >> rw []
+   >> fs [FEVERY_DEF, FLOOKUP_DEF]
+   >> metis_tac [ref_v_rel_refl])
+ >- (
+   rw [fmap_rel_OPTREL_FLOOKUP, OPTREL_def]
+   >> Cases_on `FLOOKUP s.code k`
+   >> rw []
+   >> fs [FEVERY_DEF, FLOOKUP_DEF]
+   >> pairarg_tac
+   >> simp []
+   >> fs [code_table_ok_def, FEVERY_DEF]
+   >> first_x_assum drule
+   >> simp []
+   >> rw []
+   >> `exp_rel (:'a) w [e] [e]` by metis_tac [exp_rel_refl]
+   >> full_simp_tac(srw_ss())[exp_rel_def, closed_exp_rel_rw]));
 
 val val_rel_closure = Q.store_thm(
   "val_rel_closure",
@@ -2301,15 +2332,14 @@ val evaluate_ev_timeout_clocks0 = Q.store_thm(
   Cases_on `e` >> dsimp[evaluate_ev_def, eqs, pair_case_eq, bool_case_eq] >>
   rpt strip_tac >> imp_res_tac evaluate_timeout_clocks0);
 
-
 val state_rel_refl1 = Q.store_thm ("state_rel_refl1",
-  `state_rel j w s1 s2 ⇒ state_rel j w s1 s1`,
+  `state_ok w s1 ∧ state_rel j w s1 s2 ⇒ state_rel j w s1 s1`,
  rw []
  >> match_mp_tac state_rel_refl
  >> fs [Once state_rel_rw]);
 
 val state_rel_refl2 = Q.store_thm ("state_rel_refl2",
-  `state_rel i w s1 s2 ⇒ state_rel i w s2 s2`,
+  `state_ok w s2 ∧ state_rel i w s1 s2 ⇒ state_rel i w s2 s2`,
  rw []
  >> match_mp_tac state_rel_refl
  >> fs [Once state_rel_rw]);
