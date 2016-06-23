@@ -2194,7 +2194,7 @@ val exps_ok_def = tDefine "exps_ok" `
     exps_ok (:'ffi) w [x1] ∧ exps_ok (:'ffi) w args) ∧
   (exps_ok (:'ffi) w [Tick x] ⇔ exps_ok (:'ffi) w [x]) ∧
   (exps_ok (:'ffi) w [Call dest xs] ⇔ exps_ok (:'ffi) w xs)`
- cheat;
+ (WF_REL_TAC `measure (exp3_size o SND o SND)`);
 
 val exps_ok_CONS = Q.store_thm("exps_ok_CONS",
   `exps_ok (:'ffi) w (x::xs) ⇔ exps_ok (:'ffi) w [x] ∧ exps_ok (:'ffi) w xs`,
@@ -2212,17 +2212,43 @@ val exp_rel_refl = Q.store_thm ("exp_rel_refl",
  full_simp_tac(srw_ss())[Once exps_ok_CONS] >>
  metis_tac [compat]);
 
+val vals_ok_def = tDefine "val_ok" `
+  (vals_ok (:'ffi) w [] ⇔ T) ∧
+  (vals_ok (:'ffi) w (x::y::xs) ⇔
+    vals_ok (:'ffi) w [x] ∧ vals_ok (:'ffi) w (y::xs)) ∧
+  (vals_ok (:'ffi) w [Number i] ⇔ T) ∧
+  (vals_ok (:'ffi) w [Word64 c] ⇔ T) ∧
+  (vals_ok (:'ffi) w [Block n vs] ⇔ vals_ok (:'ffi) w vs) ∧
+  (vals_ok (:'ffi) w [RefPtr n] ⇔ T) ∧
+  (vals_ok (:'ffi) w [Closure l vs vs' n e] ⇔
+    vals_ok (:'ffi) w vs ∧
+    vals_ok (:'ffi) w vs' ∧
+    exps_ok (:'ffi) w [e]) ∧
+  (vals_ok (:'ffi) w [Recclosure l vs vs' fns n] ⇔ F)`
+ (WF_REL_TAC `measure (v1_size o SND o SND)`);
+
+val vals_ok_CONS = Q.store_thm("exps_ok_CONS",
+  `vals_ok (:'ffi) w (x::xs) ⇔ vals_ok (:'ffi) w [x] ∧ vals_ok (:'ffi) w xs`,
+  Cases_on `xs` >>
+  fs [vals_ok_def]);
+
 val val_rel_refl = Q.store_thm ("val_rel_refl",
-`(!v. val_rel (:'ffi) i w v v) ∧
- (!vs. LIST_REL (val_rel (:'ffi) i w) vs vs)`,
+`(!v. vals_ok (:'ffi) w [v] ⇒ val_rel (:'ffi) i w v v) ∧
+ (!vs. vals_ok (:'ffi) w vs ⇒ LIST_REL (val_rel (:'ffi) i w) vs vs)`,
  ho_match_mp_tac v_induction >>
- srw_tac[][]
+ srw_tac[][vals_ok_def] >>
+ fs [Once vals_ok_CONS]
  >- srw_tac[][val_rel_rw]
  >- srw_tac[][val_rel_rw]
  >- srw_tac[][val_rel_rw]
  >- srw_tac[][val_rel_rw]
- >- metis_tac [exp_rel_refl, compat_closure]
- >- metis_tac [exp_rel_refl, compat_recclosure]);
+ >> (
+   irule compat_closure
+   >> simp []
+   >- (
+     rw []
+     >> fs [exps_ok_def]
+   >- metis_tac [exp_rel_refl]
 
 val ref_v_rel_refl = Q.store_thm ("ref_v_rel_refl",
 `!i rv. ref_v_rel (:'ffi) i w rv rv`,
