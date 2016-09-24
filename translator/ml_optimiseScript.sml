@@ -287,9 +287,11 @@ val OPTIMISE_def = Define `
     BOTTOM_UP_OPT (opt_sub_add o let_id) o BOTTOM_UP_OPT abs2let`;
 
 val Eval_OPTIMISE = store_thm("Eval_OPTIMISE",
-  ``Eval env exp P ==> Eval env (OPTIMISE exp) P``,
-  SIMP_TAC std_ss [Eval_def] \\ REPEAT STRIP_TAC
+  ``Eval (:'ffi) env exp P ==> Eval (:'ffi) env (OPTIMISE exp) P``,
+  rw[Eval_def]
+  \\ first_x_assum(qspec_then`s`strip_assume_tac)
   \\ Q.EXISTS_TAC `res` \\ FULL_SIMP_TAC std_ss [OPTIMISE_def]
+  \\ qexists_tac`s'`
   \\ MATCH_MP_TAC BOTTOM_UP_OPT_THM
   \\ SIMP_TAC std_ss [opt_sub_add_thm,let_id_thm]
   \\ MATCH_MP_TAC BOTTOM_UP_OPT_THM
