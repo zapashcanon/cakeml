@@ -1174,7 +1174,6 @@ fun derive_thms_for_type is_exn_type ty = let
       TAG_def |> ISPEC (numSyntax.term_of_int n) |> ISPEC (mk_var("b",type_of T))
               |> SPEC_ALL |> concl |> dest_eq |> fst
     val tag_pat_0 = fixed_tag_pat 0
-    val empty_state = empty_state_def |> concl |> dest_eq |> fst
     fun case_tac n = let
       val tag_pat_n = fixed_tag_pat n
       in
@@ -1185,20 +1184,24 @@ fun derive_thms_for_type is_exn_type ty = let
                can (match_term tag_pat_n) tm)
           \\ POP_ASSUM (fn th => FULL_SIMP_TAC (srw_ss()) [th])
           \\ PAT_X_ASSUM tag_pat_0 (MP_TAC o
-               (CONV_RULE ((RAND_CONV o RAND_CONV)
+               (CONV_RULE ((RAND_CONV o QUANT_CONV o RAND_CONV)
                  (ALPHA_CONV (mk_var("v",v_ty))))) o
                REWRITE_RULE [TAG_def,Eval_def])
           \\ POP_ASSUM (MP_TAC o REWRITE_RULE [] o remove_primes o
                         SPEC_ALL o REWRITE_RULE [TAG_def])
           \\ STRIP_TAC \\ STRIP_TAC
           \\ POP_ASSUM (STRIP_ASSUME_TAC o REWRITE_RULE [inv_def] o UNDISCH)
+          \\ CONV_TAC (REWR_CONV Eval_def)
+          \\ qx_gen_tac`s`
+          \\ last_x_assum(qspec_then`s`(qx_choosel_then[`v`,`s'`]strip_assume_tac))
           \\ PAT_X_ASSUM tag_pat (STRIP_ASSUME_TAC o UNDISCH_ALL o
                 REWRITE_RULE [GSYM AND_IMP_INTRO] o remove_primes o
                 SPEC_ALL o REWRITE_RULE [TAG_def,Eval_def])
-          \\ CONV_TAC (REWR_CONV Eval_def) \\ EXISTS_TAC (mk_var("res",v_ty))
+          \\ last_x_assum(qspec_then`s'`strip_assume_tac)
+          \\ EXISTS_TAC (mk_var("res",v_ty))
           \\ ASM_REWRITE_TAC [evaluate_Mat]
-          \\ EXISTS_TAC (mk_var("v",v_ty))
-          \\ EXISTS_TAC empty_state \\ ASM_REWRITE_TAC []
+          \\ first_assum(part_match_exists_tac (hd o strip_conj) o concl)
+          \\ ASM_REWRITE_TAC []
           \\ FULL_SIMP_TAC (srw_ss()) [pmatch_def,pat_bindings_def,
                   lookup_cons_thm,same_tid_def,id_to_n_def,
                   same_ctor_def,write_def]
@@ -1206,6 +1209,7 @@ fun derive_thms_for_type is_exn_type ty = let
             (ONCE_REWRITE_TAC [evaluate_match_rw]
              \\ ASM_SIMP_TAC (srw_ss()) [pat_bindings_def,pmatch_def,
                   same_ctor_def,same_tid_def,id_to_n_def,write_def])
+          \\ HINT_EXISTS_TAC \\ ASM_REWRITE_TAC[]
       end
     val tac = init_tac THENL (map (fn (n,f,fxs,pxs,tm,exp,xs) => case_tac n) ts)
 (*
@@ -1230,12 +1234,12 @@ val (n,f,fxs,pxs,tm,exp,xs) = hd ts
     val str = stringLib.fromMLstring tag
     val exps_tm = listSyntax.mk_list(map snd exps,astSyntax.exp_ty)
     val inv = inv_lhs |> rator |> rator
-    val tag_name = if name = "PAIR_TYPE"
+    val the_tag_name = if name = "PAIR_TYPE"
                    then optionSyntax.mk_none(astSyntax.str_id_ty)
                    else optionSyntax.mk_some(astSyntax.mk_Short str)
                 (* else optionSyntax.mk_some(full_id str) *)
     val result = mk_Eval(mk_var("env", venvironment),
-                         astSyntax.mk_Con(tag_name, exps_tm),
+                         astSyntax.mk_Con(the_tag_name, exps_tm),
                          mk_comb(inv,tm))
     fun find_inv tm =
       if type_of tm = ty then (mk_comb(rator (rator inv_lhs),tm)) else
@@ -1251,18 +1255,34 @@ val (n,f,fxs,pxs,tm,exp,xs) = hd ts
                      |> list_mk_conj
                      handle HOL_ERR _ => T
     val goal = mk_imp(cons_assum,mk_imp(tm,result))
-    fun add_primes str 0 = []
-      | add_primes str n = mk_var(str,v_ty) :: add_primes (str ^ "'") (n-1)
-    val witness = listSyntax.mk_list(add_primes "res" (length xs),v_ty)
-    val revw = listSyntax.mk_reverse(witness)
+    val lenxs = length xs
+    val s_ty = mk_thy_type{Thy="semanticPrimitives",Tyop="state",Args=[mk_vartype"'ffi"]}
+    fun mk_witness n sprev acc =
+        if n > lenxs then
+          EXISTS_TAC sprev THEN
+          EXISTS_TAC (listSyntax.mk_list(List.rev acc,v_ty)) else
+        let
+          val nstr = Int.toString n
+          val snext = mk_var(String.concat["s",nstr],s_ty)
+          val rnext = mk_var(String.concat["res",nstr],v_ty)
+        in
+            first_x_assum(
+              (X_CHOOSE_THEN rnext
+               (X_CHOOSE_THEN snext strip_assume_tac)) o SPEC sprev) THEN
+            mk_witness (n+1) snext (rnext::acc)
+        end
+    val s0 = mk_var("s0",s_ty)
     val lemma = prove(goal,
-      SIMP_TAC std_ss [Eval_def] \\ REPEAT STRIP_TAC
+      SIMP_TAC std_ss [Eval_def]
+      \\ rpt (disch_then strip_assume_tac)
+      \\ X_GEN_TAC s0
       \\ ONCE_REWRITE_TAC [evaluate_cases] \\ SIMP_TAC (srw_ss()) [PULL_EXISTS]
       \\ FULL_SIMP_TAC (srw_ss()) [inv_def,evaluate_list_SIMP,do_con_check_def,
            (*all_env_to_cenv_def,*)lookup_cons_thm,build_conv_def,id_to_n_def]
-      \\ EXISTS_TAC revw
+      \\ mk_witness 1 s0 []
       \\ FULL_SIMP_TAC std_ss [CONS_11,evaluate_list_SIMP,REVERSE_REVERSE]
-      \\ FULL_SIMP_TAC std_ss [REVERSE_DEF,evaluate_list_SIMP,APPEND,CONS_11])
+      \\ FULL_SIMP_TAC std_ss [REVERSE_DEF,evaluate_list_SIMP,APPEND,CONS_11]
+      \\ PROVE_TAC[])
     in (pat,lemma) end;
 (*
   val ((ty,case_th),(_,inv_def,eq_lemma)) = hd (zip case_thms inv_defs)
@@ -1598,13 +1618,13 @@ fun prove_EvalPatBind goal hol2deep = let
     NTAC (length vs) STRIP_TAC \\ STRIP_TAC
     \\ fsrw_tac[][FORALL_PROD] \\ REPEAT STRIP_TAC
     \\ MATCH_MP_TAC (D res) \\ fsrw_tac[][]
-    \\ fsrw_tac[][EvalPatBind_def,Pmatch_def]
+    \\ fsrw_tac[][EvalPatBind_def,pmatch_def]
     \\ REPEAT (POP_ASSUM MP_TAC)
     \\ NTAC (length vs) STRIP_TAC
     \\ CONV_TAC ((RATOR_CONV o RAND_CONV) EVAL)
-    \\ fsrw_tac[][Pmatch_def,PMATCH_option_case_rwt,LIST_TYPE_def,PAIR_TYPE_def,OPTION_TYPE_def]
+    \\ fsrw_tac[][pmatch_def,PMATCH_option_case_rwt,LIST_TYPE_def,PAIR_TYPE_def,OPTION_TYPE_def]
     \\ STRIP_TAC \\ fsrw_tac[][] \\ rev_full_simp_tac(srw_ss())[]
-    \\ fsrw_tac[][Pmatch_def,PMATCH_option_case_rwt,LIST_TYPE_def,PAIR_TYPE_def,OPTION_TYPE_def]
+    \\ fsrw_tac[][pmatch_def,PMATCH_option_case_rwt,LIST_TYPE_def,PAIR_TYPE_def,OPTION_TYPE_def]
     (*
     \\ TRY (SRW_TAC [] [Eval_Var_SIMP]
       \\ SRW_TAC [] [Eval_Var_SIMP]
@@ -2202,7 +2222,7 @@ fun inst_Eval_env v th = let
                         mk_comb(inv, v))
   val new_env = mk_write(str,mk_var("v",v_ty),mk_var("env",venvironment))
   val old_env = new_env |> rand
-  val c = SIMP_CONV bool_ss [Eval_Var_SIMP,lookup_var_write]
+  val c = SIMP_CONV bool_ss [Eval_Var_SIMP,lookup_var_write,ITSELF_UNIQUE]
           THENC DEPTH_CONV stringLib.string_EQ_CONV
           THENC REWRITE_CONV []
   val c = (RATOR_CONV o RAND_CONV) c THENC
@@ -2240,8 +2260,14 @@ fun apply_Eval_Fun v th fix = let
   val th1 = inst_Eval_env v th
   val th2 = if fix then MATCH_MP Eval_Fun_Eq (GEN (mk_var("v",v_ty)) th1)
                    else MATCH_MP Eval_Fun (GEN (mk_var("v",v_ty)) (FORCE_GEN v th1))
-  in th2 end handle HOL_ERR _ =>
+  val th3 = th2 |> ONCE_REWRITE_RULE[ITSELF_UNIQUE]
+  in th3 end handle HOL_ERR _ =>
     (apply_Eval_Fun_fail := (v, th, fix); failwith "failure in apply_Eval_Fun");
+
+val ffi_ty = mk_vartype("'ffi")
+val ffi_itself = mk_itself ffi_ty
+val ffi = mk_var("ffi",type_of ffi_itself)
+val Arrow_ffi_simp = ITSELF_UNIQUE |> ISPEC ffi |> SYM
 
 fun apply_Eval_Recclosure recc fname v th = let
   val vname = fst (dest_var v)
@@ -2277,6 +2303,7 @@ fun apply_Eval_Recclosure recc fname v th = let
   val env = mk_var("env",venvironment)
   val cl_env = mk_var("cl_env",venvironment)
   val th2 = MATCH_MP lemma (INST [env|->cl_env] (GEN (mk_var("v",v_ty)) th1))
+            |> ONCE_REWRITE_RULE[ITSELF_UNIQUE]
   val assum = ASSUME (fst (dest_imp (concl th2)))
   val th3 = D th2 |> REWRITE_RULE [assum]
                   |> REWRITE_RULE [Eval_Var_SIMP,
@@ -2952,7 +2979,7 @@ can (find_term is_arb) (rhs |> rand |> rator)
   val _ = print ("Translating " ^ msg ^ "\n")
   (* postprocess raw certificates *)
 (*
-val (fname,th,def) = hd thms
+val (fname,ml_fname,th,def) = hd thms
 *)
   fun optimise_and_abstract (fname,ml_fname,th,def) = let
     (* replace rhs with lhs *)
@@ -3032,7 +3059,7 @@ val _ = (max_print_depth := 25)
                   |> SIMP_EqualityType_ASSUMS |> UNDISCH_ALL
                   |> REWRITE_RULE [code_def]
       val eval_thm = eval_v_thm
-                     |> MATCH_MP evaluate_empty_state_IMP
+                     (*|> MATCH_MP evaluate_empty_state_IMP*)
                      |> ISPEC (get_curr_state())
                      |> REWRITE_RULE [code_def]
       val var_str = ml_fname
@@ -3106,7 +3133,7 @@ val (fname,ml_fname,def,th,v) = hd thms
         \\ FIRST (map MATCH_MP_TAC (map (fst o snd) goals))
         \\ REPEAT STRIP_TAC
         \\ POP_MP_TACs
-        \\ SIMP_TAC (srw_ss()) [ADD1,TRUE_def,FALSE_def]
+        \\ SIMP_TAC (srw_ss()) [ADD1,TRUE_def,FALSE_def,ITSELF_UNIQUE]
         \\ SIMP_TAC std_ss [UNCURRY_SIMP]
         \\ SIMP_TAC std_ss [GSYM FORALL_PROD]
         \\ METIS_TAC [])
@@ -3117,12 +3144,12 @@ val (fname,ml_fname,def,th,v) = hd thms
         \\ REPEAT STRIP_TAC
         \\ FIRST (map MATCH_MP_TAC (map (fst o snd) goals))
         \\ REPEAT STRIP_TAC
-        \\ fs[] (*For arithmetic-based goals*)
+        \\ fs[ITSELF_UNIQUE] (*For arithmetic-based goals*)
         \\ METIS_TAC[])
       handle HOL_ERR _ =>
       auto_prove "ind" (goal,
         STRIP_TAC
-        \\ SIMP_TAC std_ss [FORALL_PROD]
+        \\ SIMP_TAC std_ss [FORALL_PROD,ITSELF_UNIQUE]
         \\ (MATCH_MP_TAC ind_thm ORELSE
             MATCH_MP_TAC (SIMP_RULE bool_ss [FORALL_PROD] ind_thm))
         \\ REPEAT STRIP_TAC
@@ -3135,7 +3162,7 @@ val (fname,ml_fname,def,th,v) = hd thms
       handle HOL_ERR _ =>
       auto_prove "ind" (goal,
         STRIP_TAC
-        \\ SIMP_TAC std_ss [FORALL_PROD]
+        \\ SIMP_TAC std_ss [FORALL_PROD,ITSELF_UNIQUE]
         \\ (MATCH_MP_TAC ind_thm ORELSE
             MATCH_MP_TAC (SIMP_RULE bool_ss [FORALL_PROD] ind_thm))
         \\ REPEAT STRIP_TAC
@@ -3159,7 +3186,7 @@ val (fname,ml_fname,def,th,v) = hd thms
         \\ REPEAT STRIP_TAC
         \\ FIRST (map MATCH_MP_TAC (map (fst o snd) goals))
         \\ REPEAT STRIP_TAC
-        \\ FULL_SIMP_TAC (srw_ss()) [ADD1]
+        \\ FULL_SIMP_TAC (srw_ss()) [ADD1,ITSELF_UNIQUE]
         \\ METIS_TAC [])
     val results = UNDISCH lemma |> CONJUNCTS |> map SPEC_ALL
 (*
@@ -3197,6 +3224,7 @@ val (th,(fname,def,_,pre)) = hd (zip results thms)
       val th = th |> ii |> jj |> D |> REWRITE_RULE lemmas
                   |> SIMP_RULE std_ss [Eval_def,evaluate_Var]
                   |> SIMP_RULE std_ss [lookup_var_eq_lookup_var_id]
+                  |> REWRITE_RULE[Arrow_ffi_simp]
                   |> clean_assumptions |> UNDISCH_ALL
       val pre_def = (case pre of NONE => TRUTH | SOME pre_def => pre_def)
       val _ = add_v_thms (ml_fname,th,pre_def)
