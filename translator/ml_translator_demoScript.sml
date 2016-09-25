@@ -39,23 +39,23 @@ val lookup_qsort = save_thm("lookup_qsort",
 (* --- a more concrete example, not much use --- *)
 
 val Eval_Var_lemma = prove(
-  ``(lookup_var name env = SOME x) /\ P x ==> Eval env (Var (Short name)) P``,
+  ``(lookup_var name env = SOME x) /\ P x ==> Eval (:'ffi) env (Var (Short name)) P``,
   fs [Eval_def,lookup_var_id_def,lookup_var_def,
       Once bigStepTheory.evaluate_cases]);
 
 val ML_QSORT_CORRECT = store_thm ("ML_QSORT_CORRECT",
-  ``!env tys a ord R l xs.
+  ``!env tys a ord R l xs (s:'ffi semanticPrimitives$state).
       lookup_var_id (Short "qsort") env = SOME qsort_v /\
       LIST_TYPE a l xs /\ (lookup_var "xs" env = SOME xs) /\
       (a --> a --> BOOL) ord R /\ (lookup_var "R" env = SOME R) /\
       transitive ord /\ total ord
       ==>
-      ?l' xs'.
-        evaluate F env empty_state
+      ?l' s' xs'.
+        evaluate F env s
             (App Opapp [App Opapp [Var (Short "qsort"); Var (Short "R")]; Var (Short "xs")])
-            (empty_state,Rval xs') /\
+            (s',Rval xs') /\
         (LIST_TYPE a l' xs') /\ PERM l l' /\ SORTED ord l'``,
-  rw [] \\ imp_res_tac Eval_Var_lemma
+  rw [] \\ imp_res_tac Eval_Var_lemma \\ fs[ITSELF_UNIQUE]
   \\ imp_res_tac (DISCH_ALL (hol2deep ``QSORT R xs``)) \\ fs [Eval_def]
   \\ metis_tac [sortingTheory.QSORT_PERM,sortingTheory.QSORT_SORTED]);
 

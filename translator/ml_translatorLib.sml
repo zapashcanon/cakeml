@@ -3037,6 +3037,7 @@ val _ = (max_print_depth := 25)
       val _ = ml_prog_update (add_Dlet_Fun n v exp v_name)
       val v_def = hd (get_curr_v_defs ())
       val v_thm = lemma |> CONV_RULE (RAND_CONV (REWR_CONV (GSYM v_def)))
+                        |> REWRITE_RULE[Arrow_ffi_simp]
       val pre_def = (case pre of NONE => TRUTH | SOME pre_def => pre_def)
       val _ = add_v_thms (ml_fname,v_thm,pre_def)
       val _ = code_def |> (delete_const o fst o dest_const o fst o dest_eq o concl)
@@ -3057,7 +3058,7 @@ val _ = (max_print_depth := 25)
         in CONJUNCT1 v_thm end
       val v_thm = MATCH_MP Eval_evaluate_IMP (CONJ th eval_v_thm)
                   |> SIMP_EqualityType_ASSUMS |> UNDISCH_ALL
-                  |> REWRITE_RULE [code_def]
+                  |> REWRITE_RULE [code_def,Arrow_ffi_simp]
       val eval_thm = eval_v_thm
                      (*|> MATCH_MP evaluate_empty_state_IMP*)
                      |> ISPEC (get_curr_state())
