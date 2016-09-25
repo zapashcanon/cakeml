@@ -39,7 +39,16 @@ fun dest_vector_type ty =
 
 val is_vector_type = can dest_vector_type;
 
-val (Eval,mk_Eval,dest_Eval,is_Eval) = HolKernel.syntax_fns3 "ml_translator" "Eval";
+val ffi = mk_itself(mk_vartype"'ffi")
+
+val (Eval,mk_Eval4,dest_Eval4,is_Eval) = HolKernel.syntax_fns4 "ml_translator" "Eval";
+
+fun mk_Eval(t1,t2,t3) = mk_Eval4(ffi,t1,t2,t3)
+
+fun dest_Eval t =
+  let
+    val (_,t1,t2,t3) = dest_Eval4 t
+  in (t1,t2,t3) end
 
 fun mk_Eq(t1,t2) = let
   val (Eq,mk_Eq4,_,_) = HolKernel.syntax_fns4 "ml_translator" "Eq";
@@ -47,25 +56,33 @@ fun mk_Eq(t1,t2) = let
   val v2 = mk_var("v2",v_ty)
   in mk_Eq4(t1,t2,v1,v2) |> rator |> rator end
 
+fun list_of_quintuple (a,b,c,d,e) = [a,b,c,d,e]
+fun dest_quinop c e tm =
+  case with_exn strip_comb tm e of
+    (t, [t1,t2,t3,t4,t5]) =>
+      if same_const t c then (t1,t2,t3,t4,t5) else raise e
+  | _ => raise e
+
+val (Arrow,mk_Arrow5,dest_Arrow5,is_Arrow) =
+  HolKernel.syntax_fns {n=5,
+    make= (fn tm => HolKernel.list_mk_icomb tm o list_of_quintuple),
+    dest= dest_quinop } "ml_translator" "Arrow";
+
 fun mk_Arrow(t1,t2) = let
-  val (Arrow,mk_Arrow4,dest_Arrow4,is_Arrow) =
-    HolKernel.syntax_fns4 "ml_translator" "Arrow";
   val a = t1 |> type_of |> dest_type |> snd |> hd
   val b = t2 |> type_of |> dest_type |> snd |> hd
   val v1 = mk_var("v1",mk_type("fun",[a,b]))
   val v2 = mk_var("v1",v_ty)
-  in mk_Arrow4(t1,t2,v1,v2) |> rator |> rator end
+  in mk_Arrow5(ffi,t1,t2,v1,v2) |> rator |> rator end
 
 fun dest_Arrow t = let
-  val (Arrow,mk_Arrow4,dest_Arrow4,is_Arrow) =
-    HolKernel.syntax_fns4 "ml_translator" "Arrow";
   val t1 = t |> rator |> rand
   val t2 = t |> rand
   val a = t1 |> type_of |> dest_type |> snd |> hd
   val b = t2 |> type_of |> dest_type |> snd |> hd
   val v1 = mk_var ("v1", mk_type ("fun",[a,b]))
   val v2 = mk_var ("v2", v_ty)
-  val (t1', t2', _, _) = dest_Arrow4 (list_mk_comb (t, [v1, v2]))
+  val (_, t1', t2', _, _) = dest_Arrow5 (list_mk_comb (t, [v1, v2]))
   in (t1', t2') end
 
 fun is_Arrow t = can dest_Arrow t
