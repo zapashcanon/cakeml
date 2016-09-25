@@ -1598,18 +1598,13 @@ val IMP_PreImp = store_thm("IMP_PreImp",
   ``!b1 b2 b3. (b1 /\ b2 ==> b3) ==> b1 ==> PreImp b2 b3``,
   REPEAT Cases \\ EVAL_TAC);
 
-(*
 val evaluate_list_SIMP = store_thm("evaluate_list_SIMP",
-  ``(evaluate_list F env empty_state [] (empty_state,Rval ([])) = T) /\
-    (evaluate_list F env empty_state (x::xs) (empty_state,Rval ((y::ys))) <=>
-     evaluate F env empty_state x (empty_state,Rval (y)) /\
-     evaluate_list F env empty_state xs (empty_state,Rval (ys)))``,
+  ``(evaluate_list F env s [] (s',Rval ([])) = (s' = s)) /\
+    (evaluate_list F env s (x::xs) (s',Rval ((y::ys))) <=>
+     ∃s''. evaluate F env s x (s'',Rval (y)) /\
+     evaluate_list F env s'' xs (s',Rval (ys)))``,
   REPEAT STRIP_TAC \\ SIMP_TAC std_ss [Once evaluate_cases]
-  \\ FULL_SIMP_TAC (srw_ss()) []
-  \\ METIS_TAC[evaluate_empty_store_IMP_any_store,SND,
-               prove(``∀x. has_emp_no_fail (empty_state,Rval x)``,simp[empty_state_def]),
-               determTheory.big_exp_determ,PAIR_EQ]);
-*)
+  \\ FULL_SIMP_TAC (srw_ss()) []);
 
 val UNCURRY1 = prove(
   ``!f. UNCURRY f = \x. case x of (x,y) => f x y``,
@@ -1883,13 +1878,13 @@ val lookup_var_eq_lookup_var_id = store_thm("lookup_var_eq_lookup_var_id",
 
 val PRECONDITION_T = save_thm("PRECONDITION_T",EVAL ``PRECONDITION T``);
 
-(*
 val Eval_evaluate_IMP = store_thm("Eval_evaluate_IMP",
   ``Eval (:'ffi) env exp P /\
-    evaluate F env empty_state exp (empty_state, Rval v) ==>
+    evaluate F env (s:'ffi state) exp (s', Rval v) ==>
     P v``,
-  fs [Eval_def] \\ rw [] \\ imp_res_tac evaluate_11_Rval \\ fs []);
-*)
+  fs [Eval_def] \\ rw [] \\
+  first_x_assum(qspec_then`s`strip_assume_tac) \\
+  imp_res_tac evaluate_11_Rval \\ fs []);
 
 val pair_CASE_UNCURRY = store_thm("pair_CASE_UNCURRY",
   ``!x y. pair_CASE x y = UNCURRY y x``,
