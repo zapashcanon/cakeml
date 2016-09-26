@@ -36,6 +36,12 @@ in r end
 exception UnableToTranslate of term;
 exception UnsupportedType of hol_type;
 
+val ffi_ty = mk_vartype("'ffi")
+val state_ty = mk_state ffi_ty
+val ffi_itself = mk_itself ffi_ty
+val ffi = mk_var("ffi",type_of ffi_itself)
+val Arrow_ffi_simp = ITSELF_UNIQUE |> ISPEC ffi |> SYM
+
 (* code for managing state of certificate theorems *)
 
 fun take 0 xs = []
@@ -1256,14 +1262,13 @@ val (n,f,fxs,pxs,tm,exp,xs) = hd ts
                      handle HOL_ERR _ => T
     val goal = mk_imp(cons_assum,mk_imp(tm,result))
     val lenxs = length xs
-    val s_ty = mk_thy_type{Thy="semanticPrimitives",Tyop="state",Args=[mk_vartype"'ffi"]}
     fun mk_witness n sprev acc =
         if n > lenxs then
           EXISTS_TAC sprev THEN
           EXISTS_TAC (listSyntax.mk_list(List.rev acc,v_ty)) else
         let
           val nstr = Int.toString n
-          val snext = mk_var(String.concat["s",nstr],s_ty)
+          val snext = mk_var(String.concat["s",nstr],state_ty)
           val rnext = mk_var(String.concat["res",nstr],v_ty)
         in
             first_x_assum(
@@ -1271,7 +1276,7 @@ val (n,f,fxs,pxs,tm,exp,xs) = hd ts
                (X_CHOOSE_THEN snext strip_assume_tac)) o SPEC sprev) THEN
             mk_witness (n+1) snext (rnext::acc)
         end
-    val s0 = mk_var("s0",s_ty)
+    val s0 = mk_var("s0",state_ty)
     val lemma = prove(goal,
       SIMP_TAC std_ss [Eval_def]
       \\ rpt (disch_then strip_assume_tac)
@@ -2263,11 +2268,6 @@ fun apply_Eval_Fun v th fix = let
   val th3 = th2 |> ONCE_REWRITE_RULE[ITSELF_UNIQUE]
   in th3 end handle HOL_ERR _ =>
     (apply_Eval_Fun_fail := (v, th, fix); failwith "failure in apply_Eval_Fun");
-
-val ffi_ty = mk_vartype("'ffi")
-val ffi_itself = mk_itself ffi_ty
-val ffi = mk_var("ffi",type_of ffi_itself)
-val Arrow_ffi_simp = ITSELF_UNIQUE |> ISPEC ffi |> SYM
 
 fun apply_Eval_Recclosure recc fname v th = let
   val vname = fst (dest_var v)
