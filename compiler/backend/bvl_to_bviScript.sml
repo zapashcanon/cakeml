@@ -208,10 +208,56 @@ val compile_exps_SING = Q.store_thm("compile_exps_SING",
   REPEAT STRIP_TAC \\ IMP_RES_TAC compile_exps_LENGTH
   \\ Cases_on `c` \\ fs [LENGTH_NIL]);
 
+val inline_def = tDefine "inline" `
+  (inline cs [] = []) /\
+  (inline cs (x::y::xs) =
+     HD (inline cs [x]) :: inline cs (y::xs)) /\
+  (inline cs [Var v] = [Var v]) /\
+  (inline cs [If x1 x2 x3] =
+     [If (HD (inline cs [x1]))
+         (HD (inline cs [x2]))
+         (HD (inline cs [x3]))]) /\
+  (inline cs [Let xs x2] =
+     [Let (inline cs xs)
+           (HD (inline cs [x2]))]) /\
+  (inline cs [Raise x1] =
+     [Raise (HD (inline cs [x1]))]) /\
+  (inline cs [Op op xs] =
+     [Op op (inline cs xs)]) /\
+  (inline cs [Tick x] =
+     [Tick (HD (inline cs [x]))]) /\
+  (inline cs [Call ticks dest xs handler] =
+     let ys = inline cs xs in
+     let default = [Call ticks dest ys handler] in
+       case handler of SOME h => default | NONE =>
+       case dest of NONE => default | SOME n =>
+       case lookup n cs of
+       | NONE => default
+       | SOME code => [Let ys (mk_tick (ticks+1) code)])`
+  (WF_REL_TAC `measure (exp2_size o SND)`);
+
+val LENGTH_inline = Q.store_thm("LENGTH_inline",
+  `!cs xs. LENGTH (inline cs xs) = LENGTH xs`,
+  recInduct (fetch "-" "inline_ind") \\ REPEAT STRIP_TAC
+  \\ fs [Once inline_def,LET_DEF] \\ rw [] \\ every_case_tac \\ fs []);
+
+val HD_inline = Q.store_thm("HD_inline[simp]",
+  `[HD (inline cs [x])] = inline cs [x]`,
+  `LENGTH (inline cs [x]) = LENGTH [x]` by SRW_TAC [] [LENGTH_inline]
+  \\ Cases_on `inline cs [x]` \\ FULL_SIMP_TAC std_ss [LENGTH]
+  \\ Cases_on `t` \\ FULL_SIMP_TAC std_ss [LENGTH,HD] \\ `F` by DECIDE_TAC);
+
+val inline_x_def = Define `
+  inline_x cs Nil = Nil /\
+  inline_x cs (List ys) = List (MAP (\(n,a,c). (n,a,HD (inline cs [c]))) ys) /\
+  inline_x cs (Append x y) = Append (inline_x cs x) (inline_x cs y)`;
+
 val compile_single_def = Define `
   compile_single n (name,arg_count,exp) =
     let (c,aux,n1) = compile_exps n [exp] in
-      (aux ++ List [(num_stubs + 2 * name,arg_count,HD c)],n1)`
+    let a = num_stubs + 2 * name in
+    let c = HD c in
+      (inline_x (insert a c LN) aux ++ List [(a,arg_count,c)],n1)`
 
 val compile_list_def = Define `
   (compile_list n [] = (List [],n)) /\

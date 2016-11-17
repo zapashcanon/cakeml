@@ -41,4 +41,7 @@ val _ = Datatype `
       | Call num (num option) (exp list) (exp option)
       | Op op (exp list) `
 
+val mk_tick_def = Define `
+  mk_tick n e = FUNPOW Tick n e : bvi$exp`;
+
 val _ = export_theory();

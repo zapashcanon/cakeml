@@ -311,6 +311,9 @@ val add_compiler_compset = computeLib.extend_compset
     ,bvl_to_bviTheory.compile_single_def
     ,bvl_to_bviTheory.compile_def
     ,bvl_to_bviTheory.compile_op_def
+    ,bviTheory.mk_tick_def
+    ,bvl_to_bviTheory.inline_def
+    ,bvl_to_bviTheory.inline_x_def
     ,bvl_to_bviTheory.stubs_def
     ,bvl_to_bviTheory.CopyGlobals_code_def
     ,bvl_to_bviTheory.AllocGlobal_code_def
