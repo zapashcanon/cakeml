@@ -19,10 +19,8 @@ val inst_find_name_def = Define `
     case i of
     | Skip => Skip
     | Const r w => Const (find_name f r) w
-    | Arith (Binop bop d r ri) =>
-        Arith (Binop bop (find_name f d) (find_name f r) (ri_find_name f ri))
-    | Arith (Shift sop d r i) =>
-        Arith (Shift sop (find_name f d) (find_name f r) i)
+    | Arith (Op bop d r ri) =>
+        Arith (Op bop (find_name f d) (find_name f r) (ri_find_name f ri))
     | Arith (Div r1 r2 r3) =>
         Arith (Div (find_name f r1) (find_name f r2) (find_name f r3))
     | Arith (AddCarry r1 r2 r3 r4) =>

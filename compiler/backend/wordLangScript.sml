@@ -9,7 +9,7 @@ val _ = Datatype `
       | Var num
       | Lookup store_name
       | Load exp
-      | Op binop (exp list)`
+      | Op op (exp list)`
 
 val MEM_IMP_exp_size = Q.store_thm("MEM_IMP_exp_size",
   `!xs a. MEM a xs ==> (exp_size l a < exp1_size l xs)`,
@@ -67,9 +67,7 @@ val every_var_imm_def = Define`
 
 val every_var_inst_def = Define`
   (every_var_inst P (Const reg w) = P reg) ∧
-  (every_var_inst P (Arith (Binop bop r1 r2 ri)) =
-    (P r1 ∧ P r2 ∧ every_var_imm P ri)) ∧
-  (every_var_inst P (Arith (Not r1 r2)) = (P r1 ∧ P r2)) ∧
+  (every_var_inst P (Arith (Op _ r1 r2 ri)) = (P r1 ∧ P r2 ∧ every_var_imm P ri)) ∧
   (every_var_inst P (Arith (Div r1 r2 r3)) = (P r1 ∧ P r2 ∧ P r3)) ∧
   (every_var_inst P (Arith (AddCarry r1 r2 r3 r4)) = (P r1 ∧ P r2 ∧ P r3 ∧ P r4)) ∧
   (every_var_inst P (Arith (LongMul r1 r2 r3 r4)) = (P r1 ∧ P r2 ∧ P r3 ∧ P r4)) ∧
@@ -142,15 +140,6 @@ val every_stack_var_def = Define `
     (every_stack_var P e2 ∧ every_stack_var P e3)) ∧
   (every_stack_var P p = T)`
 
-(*Moved from wordSem, because we use them to simplify constant expressions in word_inst*)
-val num_exp_def = Define `
-  (num_exp (Nat n) = n) /\
-  (num_exp (Add x y) = num_exp x + num_exp y) /\
-  (num_exp (Sub x y) = num_exp x - num_exp y) /\
-  (num_exp (Div2 x) = num_exp x DIV 2) /\
-  (num_exp (Exp2 x) = 2 ** (num_exp x)) /\
-  (num_exp (WordWidth (w:'a word)) = dimindex (:'a))`
-
 val word_op_def = Define `
   word_op op (ws:('a word) list) =
     case (op,ws) of
@@ -158,15 +147,11 @@ val word_op_def = Define `
     | (Add,ws) => SOME (FOLDR word_add 0w ws)
     | (Or,ws) => SOME (FOLDR word_or 0w ws)
     | (Xor,ws) => SOME (FOLDR word_xor 0w ws)
-    | (Sub,[w1;w2]) => SOME (w1 - w2)
+    | (Sub,[w1;w2]) => SOME (word_sub w1 w2)
+    | (Lsl,[w1;w2]) => SOME (word_lsl w1 (w2n w2))
+    | (Lsr,[w1;w2]) => SOME (word_lsr w1 (w2n w2))
+    | (Asr,[w1;w2]) => SOME (word_asr w1 (w2n w2))
+    | (Not,[w1]) => SOME (word_1comp w1)
     | _ => NONE`;
-
-val word_sh_def = Define `
-  word_sh sh (w:'a word) n =
-    if n <> 0 /\ n ≥ dimindex (:'a) then NONE else
-      case sh of
-      | Lsl => SOME (w << n)
-      | Lsr => SOME (w >>> n)
-      | Asr => SOME (w >> n)`;
 
 val _ = export_theory();

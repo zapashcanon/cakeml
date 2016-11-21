@@ -44,7 +44,7 @@ val wStackStore_def = Define `
 val wMoveSingle_def = Define `
   wMoveSingle (x,y) (k,f,f':num) =
     case (x,y) of
-    | (INL r1, INL r2) => Inst (Arith (Binop Or r1 r2 (Reg r2)))
+    | (INL r1, INL r2) => Inst (Arith (Op Or r1 r2 (Reg r2)))
     | (INL r1, INR r2) => StackLoad r1 (f-1 - (r2 - k))
     | (INR r1, INL r2) => StackStore r2 (f-1 - (r1 - k))
     | (INR r1, INR r2) => Seq (StackLoad k (f-1 - (r2 - k)))
@@ -66,19 +66,15 @@ val wMove_def = Define `
 val wInst_def = Define `
   (wInst (Const n c) kf =
     wRegWrite1 (\n. Inst (Const n c)) n kf) /\
-  (wInst (Arith (Binop bop n1 n2 (Imm imm))) kf =
+  (wInst (Arith (Op bop n1 n2 (Imm imm))) kf =
     let (l,n2) = wReg1 n2 kf in
     wStackLoad l
-      (wRegWrite1 (\n1. Inst (Arith (Binop bop n1 n2 (Imm imm)))) n1 kf)) /\
-  (wInst (Arith (Binop bop n1 n2 (Reg n3))) kf =
+      (wRegWrite1 (\n1. Inst (Arith (Op bop n1 n2 (Imm imm)))) n1 kf)) /\
+  (wInst (Arith (Op bop n1 n2 (Reg n3))) kf =
     let (l,n2) = wReg1 n2 kf in
     let (l',n3) = wReg2 n3 kf in
     wStackLoad (l++l')
-      (wRegWrite1 (\n1. Inst (Arith (Binop bop n1 n2 (Reg n3)))) n1 kf)) /\
-  (wInst (Arith (Shift sh n1 n2 a)) kf =
-    let (l,n2) = wReg1 n2 kf in
-    wStackLoad l
-      (wRegWrite1 (\n1. Inst (Arith (Shift sh n1 n2 a))) n1 kf)) /\
+      (wRegWrite1 (\n1. Inst (Arith (Op bop n1 n2 (Reg n3)))) n1 kf)) /\
   (wInst (Arith (Div n1 n2 n3)) kf =
     let (l,n2) = wReg1 n2 kf in
     let (l',n3) = wReg2 n3 kf in

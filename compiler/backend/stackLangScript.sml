@@ -48,16 +48,16 @@ val word_shift_def = Define `
     if dimindex (:'a) = 32 then 2 else 3:num`;
 
 val _ = map overload_on
-  [("move",``\dest src. Inst (Arith (Binop Or dest src (Reg src)))``),
-   ("sub_1_inst",``\r1. Inst (Arith (Binop Sub r1 r1 (Imm 1w)))``),
-   ("sub_inst",``\r1 r2. Inst (Arith (Binop Sub r1 r1 (Reg r2)))``),
-   ("add_inst",``\r1 r2. Inst (Arith (Binop Add r1 r1 (Reg r2)))``),
-   ("add_1_inst",``\r1. Inst (Arith (Binop Add r1 r1 (Imm 1w)))``),
-   ("or_inst",``\r1 r2. Inst (Arith (Binop Or r1 r1 (Reg r2)))``),
-   ("add_bytes_in_word_inst",``\r1. Inst (Arith (Binop Add r1 r1 (Imm (bytes_in_word))))``),
-   ("div2_inst",``\r. Inst (Arith (Binop Lsr r r (Imm 1w)))``),
-   ("left_shift_inst",``\r v. Inst (Arith (Binop Lsl r r (Imm (n2w v))))``),
-   ("right_shift_inst",``\r v. Inst (Arith (Binop Lsr r r (Imm (n2w v))))``),
+  [("move",``\dest src. Inst (Arith (Op Or dest src (Reg src)))``),
+   ("sub_1_inst",``\r1. Inst (Arith (Op Sub r1 r1 (Imm 1w)))``),
+   ("sub_inst",``\r1 r2. Inst (Arith (Op Sub r1 r1 (Reg r2)))``),
+   ("add_inst",``\r1 r2. Inst (Arith (Op Add r1 r1 (Reg r2)))``),
+   ("add_1_inst",``\r1. Inst (Arith (Op Add r1 r1 (Imm 1w)))``),
+   ("or_inst",``\r1 r2. Inst (Arith (Op Or r1 r1 (Reg r2)))``),
+   ("add_bytes_in_word_inst",``\r1. Inst (Arith (Op Add r1 r1 (Imm (bytes_in_word))))``),
+   ("div2_inst",``\r. Inst (Arith (Op Lsr r r (Imm 1w)))``),
+   ("left_shift_inst",``\r v. Inst (Arith (Op Lsl r r (Imm (n2w v))))``),
+   ("right_shift_inst",``\r v. Inst (Arith (Op Lsr r r (Imm (n2w v))))``),
    ("const_inst",``\r w. Inst (Const r w)``),
    ("load_inst",``\r a. Inst (Mem Load r (Addr a 0w))``),
    ("store_inst",``\r a. Inst (Mem Store r (Addr a 0w))``)]

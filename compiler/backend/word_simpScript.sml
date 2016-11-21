@@ -145,18 +145,9 @@ val const_fp_exp_def = tDefine "const_fp_exp" `
 			| SOME w => Const w
 		        | _ => Op op (MAP Const ws))
          | _ => Op op const_fp_args) /\
-  (const_fp_exp (Shift sh e ne) cs =
-     let const_fp_exp_e = const_fp_exp e cs in
-       case const_fp_exp_e of
-         | Const c => (case word_sh sh c (num_exp ne) of
-                        | SOME w => Const w
-                        | _ => Shift sh (Const c) ne)
-         | _ => Shift sh e ne) /\
   (const_fp_exp e _ = e)`
-
-  (WF_REL_TAC `measure (exp_size (\x.0) o FST)` \\ conj_tac
-  >- (Induct \\ fs [exp_size_def] \\ rw [] \\ fs [] \\ res_tac \\ fs [])
-  >- (rw []));
+  (WF_REL_TAC `measure (exp_size (\x.0) o FST)`
+   \\ Induct \\ fs [exp_size_def] \\ rw [] \\ fs [] \\ res_tac \\ fs []);
 
 val const_fp_exp_ind = fetch "-" "const_fp_exp_ind";
 
@@ -172,8 +163,7 @@ val const_fp_move_cs_def = Define `
 
 val const_fp_inst_cs_def = Define `
   (const_fp_inst_cs (Const r _) cs = delete r cs) /\
-  (const_fp_inst_cs (Arith (Binop _ r _ _)) cs = delete r cs) /\
-  (const_fp_inst_cs (Arith (Shift _ r _ _)) cs = delete r cs) /\
+  (const_fp_inst_cs (Arith (Op _ r _ _)) cs = delete r cs) /\
   (const_fp_inst_cs (Arith (AddCarry r1 _ _ r2)) cs = delete r2 (delete r1 cs)) /\
   (const_fp_inst_cs (Arith (LongMul r1 r2 _ _)) cs = delete r1 (delete r2 cs)) /\
   (const_fp_inst_cs (Arith (LongDiv r1 r2 _ _ _)) cs = delete r1 (delete r2 cs)) /\

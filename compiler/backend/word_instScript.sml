@@ -1,9 +1,6 @@
 open preamble wordLangTheory stackLangTheory sortingTheory;
 
-val _ = ParseExtras.temp_tight_equality ();
 val _ = new_theory "word_inst";
-
-val _ = Parse.bring_to_front_overload"Shift"{Thy="wordLang",Name="Shift"};
 
 (*Scheme:
 1) Pull all nested ops and consts as far up as possible and convert
@@ -63,12 +60,11 @@ val pull_exp_def = tDefine "pull_exp"`
     let pull_ls = pull_ops op new_ls [] in
       optimize_consts op pull_ls) ∧
   (pull_exp (Load exp) = Load (pull_exp exp)) ∧
-  (pull_exp (Shift shift exp nexp) = Shift shift (pull_exp exp) nexp) ∧
   (pull_exp exp = exp)`
   (WF_REL_TAC `measure (exp_size ARB)`
    \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
    \\ TRY (FIRST_X_ASSUM (ASSUME_TAC o Q.SPEC `ARB`))
-   \\ fs[exp_size_def,asmTheory.binop_size_def,astTheory.shift_size_def,store_name_size_def]
+   \\ fs[exp_size_def,asmTheory.op_size_def,store_name_size_def]
    \\ TRY (DECIDE_TAC))
 
 (*Flatten list expressions to trees -- of the form:
@@ -86,7 +82,6 @@ val flatten_exp_def = tDefine "flatten_exp" `
   (flatten_exp (Op op [x]) = flatten_exp x) ∧
   (flatten_exp (Op op (x::xs)) = Op op [flatten_exp (Op op xs);flatten_exp x]) ∧
   (flatten_exp (Load exp) = Load (flatten_exp exp)) ∧
-  (flatten_exp (Shift shift exp nexp) = Shift shift (flatten_exp exp) nexp) ∧
   (flatten_exp exp = exp)`
   (WF_REL_TAC `measure (exp_size ARB)`
    \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -140,27 +135,17 @@ val inst_select_exp_def = tDefine "inst_select_exp" `
     | Const w =>
       (*t = r op const*)
       if c.valid_imm (INL op) w then
-        Seq p1 (Inst (Arith (Binop op tar temp (Imm w))))
+        Seq p1 (Inst (Arith (Op op tar temp (Imm w))))
       (*t = r + const --> t = r - const*)
       else if op = Add ∧ c.valid_imm (INL Sub) (-w) then
-        Seq p1 (Inst (Arith (Binop Sub tar temp (Imm (-w)))))
+        Seq p1 (Inst (Arith (Op Sub tar temp (Imm (-w)))))
       else
       (*no immediates*)
         let p2 = Inst (Const (temp+1) w) in
-        Seq p1 (Seq p2 (Inst (Arith (Binop op tar temp (Reg (temp+1))))))
+        Seq p1 (Seq p2 (Inst (Arith (Op op tar temp (Reg (temp+1))))))
     | _ =>
       let p2 = inst_select_exp c (temp+1) (temp+1) e2 in
-      Seq p1 (Seq p2 (Inst (Arith (Binop op tar temp (Reg (temp+1))))))) ∧
-  (inst_select_exp c tar temp (Shift sh exp nexp) =
-    let n = num_exp nexp in
-    if (n < dimindex(:'a)) then
-      let prog = inst_select_exp c temp temp exp in
-      if n = 0 then
-        Seq prog (Move 0 [tar,temp])
-      else
-        Seq prog (Inst (Arith (Shift sh tar temp n)))
-    else
-      Inst (Const tar 0w)) ∧
+      Seq p1 (Seq p2 (Inst (Arith (Op op tar temp (Reg (temp+1))))))) ∧
   (*Make it total*)
   (inst_select_exp _ _ _ _ = Skip)`
   (WF_REL_TAC `measure (exp_size ARB o SND o SND o SND)`
@@ -233,10 +218,8 @@ val inst_select_def = Define`
   Convert all 3 register instructions to 2 register instructions
 *)
 val three_to_two_reg_def = Define`
-  (three_to_two_reg (Inst (Arith (Binop bop r1 r2 ri))) =
-    Seq (Move 0 [r1,r2]) (Inst (Arith (Binop bop r1 r1 ri)))) ∧
-  (three_to_two_reg (Inst (Arith (Shift l r1 r2 n))) =
-    Seq (Move 0 [r1,r2]) (Inst (Arith (Shift l r1 r1 n)))) ∧
+  (three_to_two_reg (Inst (Arith (Op bop r1 r2 ri))) =
+    Seq (Move 0 [r1,r2]) (Inst (Arith (Op bop r1 r1 ri)))) ∧
   (three_to_two_reg (Inst (Arith (AddCarry r1 r2 r3 r4))) =
     Seq (Move 0 [r1,r2]) (Inst (Arith (AddCarry r1 r1 r3 r4)))) ∧
   (three_to_two_reg (Seq p1 p2) =

@@ -39,7 +39,7 @@ val stack_err_lab_def = Define `
 
 val single_stack_alloc_def = Define `
   single_stack_alloc k n =
-    Seq (Inst (Arith (Binop Sub k k (Imm (word_offset n)))))
+    Seq (Inst (Arith (Op Sub k k (Imm (word_offset n)))))
         (JumpLower k (k+1) stack_err_lab)`
 
 val stack_alloc_def = tDefine "stack_alloc" `
@@ -52,7 +52,7 @@ val stack_alloc_def = tDefine "stack_alloc" `
 
 val single_stack_free_def = Define `
   single_stack_free k n =
-    Inst (Arith (Binop Add k k (Imm (word_offset n))))`
+    Inst (Arith (Op Add k k (Imm (word_offset n))))`
 
 val stack_free_def = tDefine "stack_free" `
   stack_free k n =
@@ -66,18 +66,18 @@ val stack_free_def = tDefine "stack_free" `
 val upshift_def = tDefine"upshift"`
   upshift r n =
     if n ≤ max_stack_alloc then
-      (Inst (Arith (Binop Add r r (Imm (word_offset n))))):'a stackLang$prog
+      (Inst (Arith (Op Add r r (Imm (word_offset n))))):'a stackLang$prog
     else
-      Seq (Inst (Arith (Binop Add r r (Imm (word_offset max_stack_alloc)))))
+      Seq (Inst (Arith (Op Add r r (Imm (word_offset max_stack_alloc)))))
       (upshift r (n-max_stack_alloc))`
   (WF_REL_TAC `measure SND` \\ fs [max_stack_alloc_def] \\ decide_tac)
 
 val downshift_def = tDefine"downshift"`
   downshift r n =
     if n ≤ max_stack_alloc then
-      (Inst (Arith (Binop Sub r r (Imm (word_offset n))))) :'a stackLang$prog
+      (Inst (Arith (Op Sub r r (Imm (word_offset n))))) :'a stackLang$prog
     else
-      Seq (Inst (Arith (Binop Sub r r (Imm (word_offset max_stack_alloc)))))
+      Seq (Inst (Arith (Op Sub r r (Imm (word_offset max_stack_alloc)))))
       (downshift r (n-max_stack_alloc))`
   (WF_REL_TAC `measure SND` \\ fs [max_stack_alloc_def] \\ decide_tac)
 
@@ -118,9 +118,9 @@ val comp_def = Define `
         Seq (move r k) (stack_load r n)
     | StackLoadAny r i => Seq (Seq (move r i) (add_inst r k))
                               (Inst (Mem Load r (Addr r 0w)))
-    | StackStoreAny r i => Seq (Inst (Arith (Binop Add k k (Reg i))))
+    | StackStoreAny r i => Seq (Inst (Arith (Op Add k k (Reg i))))
                           (Seq (Inst (Mem Store r (Addr k 0w)))
-                               (Inst (Arith (Binop Sub k k (Reg i)))))
+                               (Inst (Arith (Op Sub k k (Reg i)))))
     | StackGetSize r => Seq (Seq (move r k) (sub_inst r (k+1)))
                             (right_shift_inst r (word_shift (:'a)))
     | StackSetSize r => Seq (left_shift_inst r (word_shift (:'a)))

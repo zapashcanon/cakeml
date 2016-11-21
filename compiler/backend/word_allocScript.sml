@@ -95,21 +95,17 @@ val ssa_cc_trans_inst_def = Define`
   (ssa_cc_trans_inst (Const reg w) ssa na =
     let (reg',ssa',na') = next_var_rename reg ssa na in
       (Inst (Const reg' w),ssa',na')) ∧
-  (ssa_cc_trans_inst (Arith (Binop bop r1 r2 ri)) ssa na =
+  (ssa_cc_trans_inst (Arith (Op bop r1 r2 ri)) ssa na =
     case ri of
       Reg r3 =>
       let r3' = option_lookup ssa r3 in
       let r2' = option_lookup ssa r2 in
       let (r1',ssa',na') = next_var_rename r1 ssa na in
-        (Inst (Arith (Binop bop r1' r2' (Reg r3'))),ssa',na')
+        (Inst (Arith (Op bop r1' r2' (Reg r3'))),ssa',na')
     | _ =>
       let r2' = option_lookup ssa r2 in
       let (r1',ssa',na') = next_var_rename r1 ssa na in
-        (Inst (Arith (Binop bop r1' r2' ri)),ssa',na')) ∧
-  (ssa_cc_trans_inst (Arith (Shift shift r1 r2 n)) ssa na =
-    let r2' = option_lookup ssa r2 in
-    let (r1',ssa',na') = next_var_rename r1 ssa na in
-      (Inst (Arith (Shift shift r1' r2' n)),ssa',na')) ∧
+        (Inst (Arith (Op bop r1' r2' ri)),ssa',na')) ∧
   (ssa_cc_trans_inst (Arith (Div r1 r2 r3)) ssa na =
     let r2' = option_lookup ssa r2 in
     let r3' = option_lookup ssa r3 in
@@ -168,8 +164,6 @@ val ssa_cc_trans_exp_def = tDefine "ssa_cc_trans_exp" `
   (ssa_cc_trans_exp t (Load exp) = Load (ssa_cc_trans_exp t exp)) ∧
   (ssa_cc_trans_exp t (Op wop ls) =
     Op wop (MAP (ssa_cc_trans_exp t) ls)) ∧
-  (ssa_cc_trans_exp t (Shift sh exp nexp) =
-    Shift sh (ssa_cc_trans_exp t exp) nexp) ∧
   (ssa_cc_trans_exp t expr = expr)`
   (WF_REL_TAC `measure (exp_size ARB o SND)`
   \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -330,7 +324,6 @@ val apply_colour_exp_def = tDefine "apply_colour_exp" `
   (apply_colour_exp f (Var num) = Var (f num)) /\
   (apply_colour_exp f (Load exp) = Load (apply_colour_exp f exp)) /\
   (apply_colour_exp f (Op wop ls) = Op wop (MAP (apply_colour_exp f) ls)) /\
-  (apply_colour_exp f (Shift sh exp nexp) = Shift sh (apply_colour_exp f exp) nexp) /\
   (apply_colour_exp f expr = expr)`
 (WF_REL_TAC `measure (exp_size ARB o SND)`
   \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -344,10 +337,8 @@ val apply_colour_imm_def = Define`
 val apply_colour_inst_def = Define`
   (apply_colour_inst f Skip = Skip) ∧
   (apply_colour_inst f (Const reg w) = Const (f reg) w) ∧
-  (apply_colour_inst f (Arith (Binop bop r1 r2 ri)) =
-    Arith (Binop bop (f r1) (f r2) (apply_colour_imm f ri))) ∧
-  (apply_colour_inst f (Arith (Shift shift r1 r2 n)) =
-    Arith (Shift shift (f r1) (f r2) n)) ∧
+  (apply_colour_inst f (Arith (Op bop r1 r2 ri)) =
+    Arith (Op bop (f r1) (f r2) (apply_colour_imm f ri))) ∧
   (apply_colour_inst f (Arith (Div r1 r2 r3)) =
     Arith (Div (f r1) (f r2) (f r3))) ∧
   (apply_colour_inst f (Arith (AddCarry r1 r2 r3 r4)) =
@@ -407,8 +398,7 @@ val _ = export_rewrites ["apply_nummap_key_def","apply_colour_exp_def"
 (*Writes made by any inst as a sptree*)
 val get_writes_inst_def = Define`
   (get_writes_inst (Const reg w) = insert reg () LN) ∧
-  (get_writes_inst (Arith (Binop bop r1 r2 ri)) = insert r1 () LN) ∧
-  (get_writes_inst (Arith (Shift shift r1 r2 n)) = insert r1 () LN) ∧
+  (get_writes_inst (Arith (Op bop r1 r2 ri)) = insert r1 () LN) ∧
   (get_writes_inst (Arith (Div r1 r2 r3)) = insert r1 () LN) ∧
   (get_writes_inst (Arith (AddCarry r1 r2 r3 r4)) = insert r4 () (insert r1 () LN)) ∧
   (get_writes_inst (Arith (LongMul r1 r2 r3 r4)) = insert r2 () (insert r1 () LN)) ∧
@@ -422,11 +412,9 @@ val get_writes_inst_def = Define`
 val get_live_inst_def = Define`
   (get_live_inst Skip live:num_set = live) ∧
   (get_live_inst (Const reg w) live = delete reg live) ∧
-  (get_live_inst (Arith (Binop bop r1 r2 ri)) live =
+  (get_live_inst (Arith (Op bop r1 r2 ri)) live =
     case ri of Reg r3 => insert r2 () (insert r3 () (delete r1 live))
     | _ => insert r2 () (delete r1 live)) ∧
-  (get_live_inst (Arith (Shift shift r1 r2 n)) live =
-    insert r2 () (delete r1 live)) ∧
   (get_live_inst (Arith (Div r1 r2 r3)) live =
     (insert r3 () (insert r2 () (delete r1 live)))) ∧
   (get_live_inst (Arith (AddCarry r1 r2 r3 r4)) live =
@@ -455,7 +443,6 @@ val get_live_exp_def = tDefine"get_live_exp"`
   (get_live_exp (Load exp) = get_live_exp exp) ∧
   (get_live_exp (Op wop ls) =
     big_union (MAP get_live_exp ls)) ∧
-  (get_live_exp (Shift sh exp nexp) = get_live_exp exp) ∧
   (get_live_exp expr = LN)`
   (WF_REL_TAC `measure (exp_size ARB)`>>
   rw[]>>
@@ -517,8 +504,7 @@ val get_live_def = Define`
 val remove_dead_inst_def = Define`
   (remove_dead_inst Skip (live:num_set) = T) ∧
   (remove_dead_inst (Const reg w) live = (lookup reg live = NONE)) ∧
-  (remove_dead_inst (Arith (Binop bop r1 r2 ri)) live = (lookup r1 live = NONE)) ∧
-  (remove_dead_inst (Arith (Shift shift r1 r2 n)) live = (lookup r1 live = NONE)) ∧
+  (remove_dead_inst (Arith (Op bop r1 r2 ri)) live = (lookup r1 live = NONE)) ∧
   (remove_dead_inst (Arith (Div r1 r2 r3)) live = (lookup r1 live = NONE)) ∧
   (remove_dead_inst (Arith (AddCarry r1 r2 r3 r4)) live =
     (lookup r1 live = NONE ∧ lookup r4 live = NONE)) ∧
@@ -645,10 +631,9 @@ val get_clash_sets_def = Define`
 val get_delta_inst_def = Define`
   (get_delta_inst Skip = Delta [] []) ∧
   (get_delta_inst (Const reg w) = Delta [reg] []) ∧
-  (get_delta_inst (Arith (Binop bop r1 r2 ri)) =
+  (get_delta_inst (Arith (Op bop r1 r2 ri)) =
     case ri of Reg r3 => Delta [r1] [r2;r3]
                   | _ => Delta [r1] [r2]) ∧
-  (get_delta_inst (Arith (Shift shift r1 r2 n)) = Delta [r1] [r2]) ∧
   (get_delta_inst (Arith (Div r1 r2 r3)) = Delta [r1] [r3;r2]) ∧
   (get_delta_inst (Arith (AddCarry r1 r2 r3 r4)) = Delta [r1;r4] [r4;r3;r2]) ∧
   (get_delta_inst (Arith (LongMul r1 r2 r3 r4)) = Delta [r1;r2] [r4;r3]) ∧
@@ -665,7 +650,6 @@ val get_reads_exp_def = tDefine "get_reads_exp" `
   (get_reads_exp (Load exp) = get_reads_exp exp) ∧
   (get_reads_exp (Op wop ls) =
       FLAT (MAP get_reads_exp ls)) ∧
-  (get_reads_exp (Shift sh exp nexp) = get_reads_exp exp) ∧
   (get_reads_exp expr = [])`
   (WF_REL_TAC `measure (exp_size ARB)`
   \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -832,7 +816,6 @@ val max_var_exp_def = tDefine "max_var_exp" `
   (max_var_exp (Var num) = num) ∧
   (max_var_exp (Load exp) = max_var_exp exp) ∧
   (max_var_exp (Op wop ls) = list_max (MAP (max_var_exp) ls))∧
-  (max_var_exp (Shift sh exp nexp) = max_var_exp exp) ∧
   (max_var_exp exp = 0:num)`
 (WF_REL_TAC `measure (exp_size ARB )`
   \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -842,9 +825,8 @@ val max_var_exp_def = tDefine "max_var_exp" `
 val max_var_inst_def = Define`
   (max_var_inst Skip = 0) ∧
   (max_var_inst (Const reg w) = reg) ∧
-  (max_var_inst (Arith (Binop bop r1 r2 ri)) =
+  (max_var_inst (Arith (Op bop r1 r2 ri)) =
     case ri of Reg r => max3 r1 r2 r | _ => MAX r1 r2) ∧
-  (max_var_inst (Arith (Shift shift r1 r2 n)) = MAX r1 r2) ∧
   (max_var_inst (Arith (Div r1 r2 r3)) = max3 r1 r2 r3) ∧
   (max_var_inst (Arith (AddCarry r1 r2 r3 r4)) = MAX (MAX r1 r2) (MAX r3 r4)) ∧
   (max_var_inst (Arith (LongMul r1 r2 r3 r4)) = MAX (MAX r1 r2) (MAX r3 r4)) ∧
