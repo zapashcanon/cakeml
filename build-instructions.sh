@@ -35,6 +35,6 @@ git clone https://github.com/CakeML/cakeml
 cd cakeml
 ## optionally switch to a released version, e.g., version1
 # git checkout version1
-$HOME/HOL/bin/Holmake
+Holmake
 ## or just Holmake if you set up your PATH as above
 # Holmake
