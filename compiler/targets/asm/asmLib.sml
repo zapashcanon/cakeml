@@ -18,7 +18,7 @@ fun write_mem_word n =
 
 val asm_ok_rwts =
    [asm_ok_def, inst_ok_def, addr_ok_def, reg_ok_def, arith_ok_def, cmp_ok_def,
-    reg_imm_ok_def, offset_ok_def, alignmentTheory.aligned_0]
+    reg_imm_ok_def, offset_ok_def, alignmentTheory.aligned_0, isImm_def]
 
 val asm_rwts =
    [upd_pc_def, upd_reg_def, upd_mem_def, read_reg_def, read_mem_def,
@@ -50,7 +50,7 @@ local
      `Inst (Const r w) : 'a asm`,
      `Inst (Arith (Binop b r1 r2 (Reg r3))) : 'a asm`,
      `Inst (Arith (Binop b r1 r2 (Imm w))) : 'a asm`,
-     `Inst (Arith (Shift s r1 r2 n)) : 'a asm`,
+     `Inst (Arith (Not r1 r2)) : 'a asm`,
      `Inst (Arith (Div r1 r2 r3)) : 'a asm`,
      `Inst (Arith (LongMul r1 r2 r3 r4)) : 'a asm`,
      `Inst (Arith (LongDiv r1 r2 r3 r4 r5)) : 'a asm`,

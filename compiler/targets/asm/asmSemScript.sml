@@ -37,7 +37,9 @@ val binop_upd_def = Define `
   (binop_upd r And w1 w2 = upd_reg r (word_and w1 w2)) /\
   (binop_upd r Or w1 w2  = upd_reg r (word_or w1 w2)) /\
   (binop_upd r Xor w1 w2 = upd_reg r (word_xor w1 w2)) /\
-  (binop_upd r Not w1 w2 = upd_reg r (word_1comp w1))`
+  (binop_upd r Lsl w1 w2 = upd_reg r (word_lsl w1 (w2n w2))) /\
+  (binop_upd r Lsr w1 w2 = upd_reg r (word_lsr w1 (w2n w2))) /\
+  (binop_upd r Asr w1 w2 = upd_reg r (word_asr w1 (w2n w2)))`
 
 val word_cmp_def = Define `
   (word_cmp Equal w1 w2 = (w1 = w2)) /\
@@ -51,16 +53,11 @@ val word_cmp_def = Define `
 
 val is_test_def = Define `is_test c <=> (c = Test) \/ (c = NotTest)`
 
-val word_shift_def = Define `
-  (word_shift Lsl w n = w << n) /\
-  (word_shift Lsr w n = w >>> n) /\
-  (word_shift Asr w n = w >> n)`
-
 val arith_upd_def = Define `
   (arith_upd (Binop b r1 r2 (ri:'a reg_imm)) s =
      binop_upd r1 b (read_reg r2 s) (reg_imm ri s) s) /\
-  (arith_upd (Shift l r1 r2 n) s =
-     upd_reg r1 (word_shift l (read_reg r2 s) n) s) /\
+  (arith_upd (Not r1 r2) s =
+     upd_reg r1 (word_1comp (read_reg r2 s)) s) /\
   (arith_upd (Div r1 r2 r3) s =
      let q = read_reg r3 s in
        assert (q <> 0w) (upd_reg r1 (read_reg r2 s // q) s)) /\
