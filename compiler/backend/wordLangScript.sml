@@ -4,24 +4,12 @@ val _ = new_theory "wordLang";
 
 (* word lang = structured program with words, stack and memory *)
 
-val _ = Parse.type_abbrev("shift",``:ast$shift``);
-val _ = ParseExtras.tight_equality()
-
-val _ = Datatype `
-  num_exp = Nat num
-          | Add num_exp num_exp
-          | Sub num_exp num_exp
-          | Div2 num_exp
-          | Exp2 num_exp
-          | WordWidth ('a word)`
-
 val _ = Datatype `
   exp = Const ('a word)
       | Var num
       | Lookup store_name
       | Load exp
-      | Op binop (exp list)
-      | Shift shift exp ('a num_exp)`
+      | Op binop (exp list)`
 
 val MEM_IMP_exp_size = Q.store_thm("MEM_IMP_exp_size",
   `!xs a. MEM a xs ==> (exp_size l a < exp1_size l xs)`,
@@ -67,7 +55,6 @@ val every_var_exp_def = tDefine "every_var_exp" `
   (every_var_exp P (Var num) = P num) ∧
   (every_var_exp P (Load exp) = every_var_exp P exp) ∧
   (every_var_exp P (Op wop ls) = EVERY (every_var_exp P) ls) ∧
-  (every_var_exp P (Shift sh exp nexp) = every_var_exp P exp) ∧
   (every_var_exp P expr = T)`
 (WF_REL_TAC `measure (exp_size ARB o SND)`
   \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -82,7 +69,7 @@ val every_var_inst_def = Define`
   (every_var_inst P (Const reg w) = P reg) ∧
   (every_var_inst P (Arith (Binop bop r1 r2 ri)) =
     (P r1 ∧ P r2 ∧ every_var_imm P ri)) ∧
-  (every_var_inst P (Arith (Shift shift r1 r2 n)) = (P r1 ∧ P r2)) ∧
+  (every_var_inst P (Arith (Not r1 r2)) = (P r1 ∧ P r2)) ∧
   (every_var_inst P (Arith (Div r1 r2 r3)) = (P r1 ∧ P r2 ∧ P r3)) ∧
   (every_var_inst P (Arith (AddCarry r1 r2 r3 r4)) = (P r1 ∧ P r2 ∧ P r3 ∧ P r4)) ∧
   (every_var_inst P (Arith (LongMul r1 r2 r3 r4)) = (P r1 ∧ P r2 ∧ P r3 ∧ P r4)) ∧

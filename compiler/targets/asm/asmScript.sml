@@ -76,14 +76,13 @@ val () = Datatype `
   reg_imm = Reg reg | Imm ('a imm)`
 
 val () = Datatype `
-  binop = Add | Sub | And | Or | Xor | Lsl | Lsr | Asr`
+  op = Add | Sub | And | Or | Xor | Lsl | Lsr | Asr | Not`
 
 val () = Datatype `
   cmp = Equal | Lower | Less | Test | NotEqual | NotLower | NotLess | NotTest`
 
 val () = Datatype `
-  arith = Binop binop reg reg ('a reg_imm)
-        | Not reg reg
+  arith = Op op reg reg ('a reg_imm)
         | Div reg reg reg
         | LongMul reg reg reg reg
         | LongDiv reg reg reg reg reg
@@ -126,7 +125,7 @@ val () = Datatype `
      ; avoid_regs     : num list
      ; reg_count      : num
      ; two_reg_arith  : bool
-     ; valid_imm      : (binop + cmp) -> 'a word -> bool
+     ; valid_imm      : (op + cmp) -> 'a word -> bool
      ; addr_offset    : 'a word # 'a word
      ; jump_offset    : 'a word # 'a word
      ; cjump_offset   : 'a word # 'a word
@@ -146,15 +145,14 @@ val isImm_def = Define `
 
 (* Requires register inequality for some architectures *)
 val arith_ok_def = Define `
-  (arith_ok (Binop b r1 r2 ri) c <=>
+  (arith_ok (Op b r1 r2 ri) c <=>
      (* note: register to register moves can be implmented with
               "Or" on "two_reg_arith" architectures. *)
      (c.two_reg_arith ==> (r1 = r2) \/ (b = Or) /\ (ri = Reg r2)) /\
      (* shift do not yet allow for variable shift lengths *)
      ((b = Lsl) \/ (b = Lsr) \/ (b = Asr) ==> isImm ri) /\
+     ((b = Not) ==> (ri = Imm 0w)) /\
      reg_ok r1 c /\ reg_ok r2 c /\ reg_imm_ok (INL b) ri c) /\
-  (arith_ok (Not r1 r2) c <=>
-     (c.two_reg_arith ==> (r1 = r2))) /\
   (arith_ok (Div r1 r2 r3) c <=>
      reg_ok r1 c /\ reg_ok r2 c /\ reg_ok r3 c /\
      c.ISA IN {ARMv8; MIPS; RISC_V}) /\

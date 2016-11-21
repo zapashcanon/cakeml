@@ -22,7 +22,7 @@ val asm_ok_rwts =
 
 val asm_rwts =
    [upd_pc_def, upd_reg_def, upd_mem_def, read_reg_def, read_mem_def,
-    assert_def, reg_imm_def, binop_upd_def, word_cmp_def, word_shift_def,
+    assert_def, reg_imm_def, op_upd_def, word_cmp_def,
     arith_upd_def, addr_def, mem_load_def, write_mem_word_def, mem_store_def,
     read_mem_word ``1n``, read_mem_word ``4n``, read_mem_word ``8n``,
     write_mem_word ``1n``, write_mem_word ``4n``, write_mem_word ``8n``,
@@ -48,8 +48,8 @@ local
     [
      `Inst Skip : 'a asm`,
      `Inst (Const r w) : 'a asm`,
-     `Inst (Arith (Binop b r1 r2 (Reg r3))) : 'a asm`,
-     `Inst (Arith (Binop b r1 r2 (Imm w))) : 'a asm`,
+     `Inst (Arith (Op b r1 r2 (Reg r3))) : 'a asm`,
+     `Inst (Arith (Op b r1 r2 (Imm w))) : 'a asm`,
      `Inst (Arith (Not r1 r2)) : 'a asm`,
      `Inst (Arith (Div r1 r2 r3)) : 'a asm`,
      `Inst (Arith (LongMul r1 r2 r3 r4)) : 'a asm`,
@@ -110,15 +110,14 @@ val asm_type = asm_type [``:64``]
 val add_asm_compset = computeLib.extend_compset
   [computeLib.Defs
      [upd_pc_def, upd_reg_def, upd_mem_def, read_reg_def, read_mem_def,
-      assert_def, reg_imm_def, binop_upd_def, word_cmp_def, word_shift_def,
+      assert_def, reg_imm_def, op_upd_def, word_cmp_def,
       arith_upd_def, addr_def, mem_load_def, write_mem_word_def, mem_store_def,
       read_mem_word_def, mem_op_def, is_test_def, inst_def, jump_to_offset_def,
       asm_def, alignmentTheory.aligned_extract,offset_ok_def],
    computeLib.Convs
      [(asm_ok_tm, 2, asm_ok_conv)],
    computeLib.Tys
-     (List.map ast_type0 ["shift"] @
-      List.map asm_type0 ["cmp", "memop", "binop"] @
+     (List.map asm_type0 ["cmp", "memop", "op"] @
       List.map asm_type  ["asm_config", "asm", "inst"])]
 
 (* some custom tools/tactics ---------------------------------------------- *)
@@ -293,11 +292,9 @@ fun asm_cases_tac i =
       Q.MATCH_GOALSUB_RENAME_TAC `Arith a`
       \\ Cases_on `a`
       >| [
-        Q.MATCH_GOALSUB_RENAME_TAC `Binop b _ _ r`
+        Q.MATCH_GOALSUB_RENAME_TAC `Op b _ _ r`
         \\ Cases_on `r`
         \\ Cases_on `b`,
-        Q.MATCH_GOALSUB_RENAME_TAC `Shift s _ _ _`
-        \\ Cases_on `s`,
         all_tac, (* Div *)
         all_tac, (* LongMul *)
         all_tac, (* LongDiv *)
@@ -334,8 +331,7 @@ in
   val isConst = can_match `asm$Inst (asm$Const _ _)`
   val isArith = can_match `asm$Inst (asm$Arith _)`
   val isMem = can_match `asm$Inst (asm$Mem _ _ _)`
-  val isBinop = can_match `asm$Inst (asm$Arith (asm$Binop _ _ _ _))`
-  val isShift = can_match `asm$Inst (asm$Arith (asm$Shift _ _ _ _))`
+  val isOp = can_match `asm$Inst (asm$Arith (asm$Op _ _ _ _))`
   val isAddCarry = can_match `asm$Inst (asm$Arith (asm$AddCarry _ _ _ _))`
 end
 
