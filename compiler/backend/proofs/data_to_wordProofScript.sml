@@ -2837,8 +2837,7 @@ val eval_tac = fs [wordSemTheory.evaluate_def,
   bvi_to_data_def, wordSemTheory.the_words_def,
   bviSemTheory.bvl_to_bvi_def, data_to_bvi_def,
   bviSemTheory.bvi_to_bvl_def,wordSemTheory.mem_load_def,
-  wordLangTheory.word_op_def, wordLangTheory.word_sh_def,
-  wordLangTheory.num_exp_def]
+  wordLangTheory.word_op_def]
 
 val INT_EQ_NUM_LEMMA = Q.store_thm("INT_EQ_NUM_LEMMA",
   `0 <= (i:int) <=> ?index. i = & index`,
@@ -3099,9 +3098,7 @@ val lookup_RefByte_location = Q.prove(
 val word_exp_rw = LIST_CONJ
   [wordSemTheory.word_exp_def,
    wordLangTheory.word_op_def,
-   wordLangTheory.word_sh_def,
    wordSemTheory.get_var_imm_def,
-   wordLangTheory.num_exp_def,
    wordSemTheory.the_words_def,
    lookup_insert]
 
@@ -4832,10 +4829,8 @@ val th = Q.store_thm("assign_WordFromInt",
     \\ simp[Once wordSemTheory.evaluate_def,wordSemTheory.get_var_imm_def,asmSemTheory.word_cmp_def]
     \\ simp[Once wordSemTheory.evaluate_def]
     \\ simp[evaluate_Assign]
-    \\ simp[word_exp_rw |> CONJUNCTS |> first(can(find_term(same_const``wordLang$Shift``)) o concl)]
     \\ simp[word_exp_rw |> CONJUNCTS |> first(can(find_term(same_const``wordLang$Var``)) o concl)]
     \\ fs[wordSemTheory.get_var_def]
-    \\ simp[wordSemTheory.word_sh_def,wordLangTheory.num_exp_def]
     \\ simp[wordSemTheory.set_var_def]
     \\ rpt_drule memory_rel_Number_IMP
     \\ strip_tac \\ clean_tac

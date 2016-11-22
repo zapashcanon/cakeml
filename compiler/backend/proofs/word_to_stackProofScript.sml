@@ -3236,7 +3236,6 @@ val map_var_def = tDefine"map_var"`
   (map_var f (Var num) = Var (f num)) ∧
   (map_var f (Load exp) = Load (map_var f exp)) ∧
   (map_var f (Op wop ls) = Op wop (MAP (map_var f) ls)) ∧
-  (map_var f (Shift sh e1 e2) = Shift sh (map_var f e1) e2) ∧
   (map_var f (Const c) = Const c) ∧
   (map_var f (Lookup v) = Lookup v)`
 (WF_REL_TAC`measure (exp_size ARB o SND)`

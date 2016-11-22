@@ -154,7 +154,6 @@ val word_offset_eq = Q.store_thm("word_offset_eq",
 val good_syntax_exp_def = tDefine"good_syntax_exp"`
   (good_syntax_exp (Var n) k ⇔ n < k) ∧
   (good_syntax_exp (Load e) k ⇔ good_syntax_exp e k) ∧
-  (good_syntax_exp (Shift _ e _) k ⇔ good_syntax_exp e k) ∧
   (good_syntax_exp (Lookup _) _ ⇔ F) ∧
   (good_syntax_exp (Op _ es) k ⇔ EVERY (λe. good_syntax_exp e k) es) ∧
   (good_syntax_exp _ _ ⇔ T)`
@@ -166,10 +165,11 @@ val _ = export_rewrites["good_syntax_exp_def"];
 val good_syntax_inst_def = Define`
   (good_syntax_inst (Mem _ n (Addr a _)) k ⇔ n < k ∧ a < k) ∧
   (good_syntax_inst (Const n _) k ⇔ n < k) ∧
-  (good_syntax_inst (Arith (Shift _ n r2 _)) k ⇔ r2 < k ∧ n < k) ∧
-  (good_syntax_inst (Arith (Binop _ n r2 ri)) k ⇔ r2 < k ∧ n < k ∧ (case ri of Reg r1 => r1 < k | _ => T)) ∧
+  (good_syntax_inst (Arith (Op _ n r2 ri)) k ⇔ r2 < k ∧ n < k ∧ (case ri of Reg r1 => r1 < k | _ => T)) ∧
   (good_syntax_inst (Arith (Div r1 r2 r3)) k ⇔ r1 < k ∧ r2 < k ∧ r3 < k) ∧
   (good_syntax_inst (Arith (AddCarry r1 r2 r3 r4)) k ⇔ r1 < k ∧ r2 < k ∧ r3 < k ∧ r4 < k) ∧
+  (good_syntax_inst (Arith (AddOverflow r1 r2 r3 r4)) k ⇔ r1 < k ∧ r2 < k ∧ r3 < k ∧ r4 < k) ∧
+  (good_syntax_inst (Arith (SubOverflow r1 r2 r3 r4)) k ⇔ r1 < k ∧ r2 < k ∧ r3 < k ∧ r4 < k) ∧
   (good_syntax_inst (Arith (LongMul r1 r2 r3 r4)) k ⇔ r1 < k ∧ r2 < k ∧ r3 < k ∧ r4 < k) ∧
   (good_syntax_inst (Arith (LongDiv r1 r2 r3 r4 r5)) k ⇔ r1 < k ∧ r2 < k ∧ r3 < k ∧ r4 < k ∧ r5 < k) ∧
   (good_syntax_inst _ _ ⇔ T)`;
@@ -1530,7 +1530,6 @@ val comp_correct = Q.prove(
     \\ simp[wordLangTheory.word_op_def]
     \\ qexists_tac`0` \\ simp[]
     \\ simp[Once set_var_def,FLOOKUP_UPDATE]
-    \\ simp[wordLangTheory.word_sh_def,wordLangTheory.num_exp_def]
     \\ IF_CASES_TAC \\ simp[]
     >- (
       full_simp_tac(srw_ss())[word_shift_def]
@@ -1575,7 +1574,6 @@ val comp_correct = Q.prove(
     \\ simp[wordLangTheory.word_op_def]
     \\ qexists_tac`0` \\ simp[]
     \\ simp[Once set_var_def,FLOOKUP_UPDATE]
-    \\ simp[wordLangTheory.word_sh_def,wordLangTheory.num_exp_def]
     \\ IF_CASES_TAC \\ simp[]
     >- (
       full_simp_tac(srw_ss())[word_shift_def]
@@ -1613,8 +1611,7 @@ val comp_correct = Q.prove(
     \\ full_simp_tac(srw_ss())[LET_THM,stackSemTheory.inst_def,stackSemTheory.assign_def,
            word_exp_def,set_var_def,FLOOKUP_UPDATE,get_var_def]
     \\ `FLOOKUP t1.regs v = SOME (Word c)` by metis_tac [state_rel_def] \\ full_simp_tac(srw_ss())[]
-    \\ full_simp_tac(srw_ss())[wordLangTheory.word_op_def,FLOOKUP_UPDATE,wordLangTheory.num_exp_def,
-           wordLangTheory.word_sh_def]
+    \\ full_simp_tac(srw_ss())[wordLangTheory.word_op_def,FLOOKUP_UPDATE]
     \\ `mem_load (c << word_shift (:'a) + ww << word_shift (:'a)) t1 =
         SOME (Word (EL (w2n c) s.bitmaps))` by
      (full_simp_tac(srw_ss())[state_rel_def] \\ ntac 2 (qpat_x_assum `xx = SOME yy` kall_tac)
@@ -1877,9 +1874,9 @@ val compile_semantics = Q.store_thm("compile_semantics",
 val tac = simp [list_Seq_def,evaluate_def,inst_def,word_exp_def,get_var_def,
        wordLangTheory.word_op_def,mem_load_def,assign_def,set_var_def,
        FLOOKUP_UPDATE,mem_store_def,dec_clock_def,get_var_imm_def,
-       asmSemTheory.word_cmp_def,wordLangTheory.num_exp_def,
+       asmSemTheory.word_cmp_def,halt_inst_def,
        labSemTheory.word_cmp_def,GREATER_EQ,GSYM NOT_LESS,FUPDATE_LIST,
-       wordLangTheory.word_sh_def,halt_inst_def]
+       wordLangTheory.word_op_def]
 
 val mem_val_def = Define `
   (mem_val regs (INL w) = Word w) /\

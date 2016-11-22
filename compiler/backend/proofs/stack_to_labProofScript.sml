@@ -13,11 +13,6 @@ val _ = new_theory"stack_to_labProof";
 
 (* TODO: move *)
 
-val word_sh_word_shift = Q.store_thm("word_sh_word_shift",
-  `word_sh a b c = SOME z ⇒ z = word_shift a b c`,
-  EVAL_TAC >> srw_tac[][] >> every_case_tac >> full_simp_tac(srw_ss())[] >>
-  EVAL_TAC >> srw_tac[][]);
-
 val assert_T = Q.store_thm("assert_T[simp]",
   `assert T s = s`,
   srw_tac[][assert_def,state_component_equality]);
@@ -182,11 +177,10 @@ val inst_correct = Q.store_thm("inst_correct",
   full_simp_tac(srw_ss())[LET_THM,get_vars_def,get_var_def] >>
   every_case_tac >> full_simp_tac(srw_ss())[] >> srw_tac[][] >>
   imp_res_tac state_rel_read_reg_FLOOKUP_regs >> rfs[] >> rw[] >>
-  imp_res_tac word_sh_word_shift >>
-  full_simp_tac(srw_ss())[wordLangTheory.num_exp_def,wordLangTheory.word_op_def] >> srw_tac[][] >>
+  full_simp_tac(srw_ss())[wordLangTheory.word_op_def] >> srw_tac[][] >>
   imp_res_tac state_rel_read_reg_FLOOKUP_regs >> rfs[] >> rw[] >>
-  TRY ( full_simp_tac(srw_ss())[binop_upd_def] >> match_mp_tac set_var_upd_reg >> full_simp_tac(srw_ss())[] >> NO_TAC) >>
-  TRY ( Cases_on`b`>>full_simp_tac(srw_ss())[binop_upd_def] >> NO_TAC) >>
+  TRY ( full_simp_tac(srw_ss())[op_upd_def] >> match_mp_tac set_var_upd_reg >> full_simp_tac(srw_ss())[] >> NO_TAC) >>
+  TRY ( Cases_on`b`>>full_simp_tac(srw_ss())[op_upd_def] >> NO_TAC) >>
   TRY (
     rename1 `mem_load` >>
     full_simp_tac(srw_ss())[stackSemTheory.mem_load_def,labSemTheory.mem_load_def,labSemTheory.addr_def] >>

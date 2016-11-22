@@ -365,13 +365,11 @@ val add_compiler_compset = computeLib.extend_compset
     ]
   ,computeLib.Tys
     [ (* wordLang *)
-     ``:'a wordLang$num_exp``
-    ,``:'a wordLang$exp``
+     ``:'a wordLang$exp``
     ,``:'a wordLang$prog``
     ]
   ,computeLib.Defs
     [wordLangTheory.every_var_exp_def
-    ,wordLangTheory.num_exp_def
     ,wordLangTheory.word_op_def
     ,wordLangTheory.every_var_imm_def
     ,wordLangTheory.every_stack_var_def
@@ -703,7 +701,7 @@ val add_compiler_compset = computeLib.extend_compset
     [ (*asm -- 'a should be 64*)
      ``:'a asm_config``
     ,``:'a reg_imm``
-    ,``:binop``
+    ,``:asm$op``
     ,``:cmp``
     ,``:shift``
     ,``:'a arith``

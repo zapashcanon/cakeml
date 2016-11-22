@@ -624,9 +624,9 @@ val word_shift_not_0 = Q.store_thm("word_shift_not_0",
 val tac = simp [list_Seq_def,evaluate_def,inst_def,word_exp_def,get_var_def,
        wordLangTheory.word_op_def,mem_load_def,assign_def,set_var_def,
        FLOOKUP_UPDATE,mem_store_def,dec_clock_def,get_var_imm_def,
-       asmSemTheory.word_cmp_def,wordLangTheory.num_exp_def,
+       asmSemTheory.word_cmp_def,wordLangTheory.word_op_def,
        labSemTheory.word_cmp_def,GREATER_EQ,GSYM NOT_LESS,FUPDATE_LIST,
-       wordLangTheory.word_sh_def,word_shift_not_0,FLOOKUP_UPDATE]
+       word_shift_not_0,FLOOKUP_UPDATE]
 
 val memcpy_code_thm = Q.prove(
   `!n a b m dm b1 m1 s.

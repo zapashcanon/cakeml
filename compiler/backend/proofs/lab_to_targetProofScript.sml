@@ -1182,7 +1182,7 @@ val Inst_lemma = Q.prove(
     conj_asm1_tac >- (
       Cases_on`a`>> full_simp_tac(srw_ss())[asmSemTheory.arith_upd_def,labSemTheory.arith_upd_def] >>
       every_case_tac >> full_simp_tac(srw_ss())[labSemTheory.assert_def] >> srw_tac[][] >>
-      full_simp_tac(srw_ss())[reg_imm_def,binop_upd_def,labSemTheory.binop_upd_def] >>
+      full_simp_tac(srw_ss())[reg_imm_def,op_upd_def,labSemTheory.op_upd_def] >>
       full_simp_tac(srw_ss())[upd_reg_def,labSemTheory.upd_reg_def,state_rel_def] >>
       TRY (Cases_on`b`)>>EVAL_TAC >> full_simp_tac(srw_ss())[state_rel_def]
       (*Div*)
