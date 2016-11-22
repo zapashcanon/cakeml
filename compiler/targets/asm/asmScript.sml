@@ -76,7 +76,7 @@ val () = Datatype `
   reg_imm = Reg reg | Imm ('a imm)`
 
 val () = Datatype `
-  op = Add | Sub | And | Or | Xor | Lsl | Lsr | Asr | Not`
+  op = Add | Sub | And | Or | Xor | Lsl | Lsr | Asr`
 
 val () = Datatype `
   cmp = Equal | Lower | Less | Test | NotEqual | NotLower | NotLess | NotTest`
@@ -151,7 +151,6 @@ val arith_ok_def = Define `
      (c.two_reg_arith ==> (r1 = r2) \/ (b = Or) /\ (ri = Reg r2)) /\
      (* shift do not yet allow for variable shift lengths *)
      ((b = Lsl) \/ (b = Lsr) \/ (b = Asr) ==> isImm ri) /\
-     ((b = Not) ==> (ri = Imm 0w)) /\
      reg_ok r1 c /\ reg_ok r2 c /\ reg_imm_ok (INL b) ri c) /\
   (arith_ok (Div r1 r2 r3) c <=>
      reg_ok r1 c /\ reg_ok r2 c /\ reg_ok r3 c /\

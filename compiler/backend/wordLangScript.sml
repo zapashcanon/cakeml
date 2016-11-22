@@ -153,7 +153,6 @@ val word_op_def = Define `
     | (Lsl,[w1;w2]) => SOME (word_lsl w1 (w2n w2))
     | (Lsr,[w1;w2]) => SOME (word_lsr w1 (w2n w2))
     | (Asr,[w1;w2]) => SOME (word_asr w1 (w2n w2))
-    | (Not,[w1]) => SOME (word_1comp w1)
     | _ => NONE`;
 
 val _ = export_theory();

@@ -37,7 +37,6 @@ val op_upd_def = Define `
   (op_upd r And w1 w2 = upd_reg r (word_and w1 w2)) /\
   (op_upd r Or w1 w2  = upd_reg r (word_or w1 w2)) /\
   (op_upd r Xor w1 w2 = upd_reg r (word_xor w1 w2)) /\
-  (op_upd r Not w1 _  = upd_reg r (word_1comp w1)) /\
   (op_upd r Lsl w1 w2 = upd_reg r (word_lsl w1 (w2n w2))) /\
   (op_upd r Lsr w1 w2 = upd_reg r (word_lsr w1 (w2n w2))) /\
   (op_upd r Asr w1 w2 = upd_reg r (word_asr w1 (w2n w2)))`
