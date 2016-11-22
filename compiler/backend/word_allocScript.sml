@@ -429,7 +429,7 @@ val get_writes_inst_def = Define`
   (get_writes_inst (Arith (LongDiv r1 r2 r3 r4 r5)) = insert r2 () (insert r1 () LN)) ∧
   (get_writes_inst (Mem Load r (Addr a w)) = insert r () LN) ∧
   (get_writes_inst (Mem Load8 r (Addr a w)) = insert r () LN) ∧
-  (get_writes_inst inst = LN)`
+  (get_writes_inst inst = LN)`;
 
 (*Liveness for instructions, follows liveness equations
   live-sets are num_sets a.k.a. unit-sptrees*)
@@ -445,9 +445,9 @@ val get_live_inst_def = Define`
     (*r4 is live anyway*)
     insert r4 () (insert r3 () (insert r2 () (delete r1 live)))) ∧
   (get_live_inst (Arith (AddOverflow r1 r2 r3 r4)) live =
-    insert r3 () (insert r2 () (delete r4 (delete r1 live))))) ∧
+    insert r3 () (insert r2 () (delete r4 (delete r1 live)))) ∧
   (get_live_inst (Arith (SubOverflow r1 r2 r3 r4)) live =
-    insert r3 () (insert r2 () (delete r4 (delete r1 live))))) ∧
+    insert r3 () (insert r2 () (delete r4 (delete r1 live)))) ∧
   (get_live_inst (Arith (LongMul r1 r2 r3 r4)) live =
     insert r4 () (insert r3 () (delete r2 (delete r1 live)))) ∧
   (get_live_inst (Arith (LongDiv r1 r2 r3 r4 r5)) live =
