@@ -2225,12 +2225,8 @@ val flat_exp_conventions_def = Define`
 
 (* Well-formed instructions *)
 val inst_ok_less_def = Define`
-  (inst_ok_less (c:'a asm_config) (Arith (Binop b r1 r2 (Imm w)))=
+  (inst_ok_less (c:'a asm_config) (Arith (Op b r1 r2 (Imm w)))=
     c.valid_imm (INL b) w) ∧
-  (inst_ok_less c (Arith (Shift l r1 r2 n)) =
-    (((n = 0) ==> (l = Lsl)) ∧ n < dimindex(:'a))) ∧
-  (inst_ok_less c (Arith (Shift l r1 r2 n)) =
-    (((n = 0) ==> (l = Lsl)) ∧ n < dimindex(:'a))) ∧
   (inst_ok_less c (Arith (Div r1 r2 r3)) =
     (c.ISA ∈ {ARMv8; MIPS; RISC_V})) ∧
   (inst_ok_less c (Arith (LongMul r1 r2 r3 r4)) =
@@ -2246,10 +2242,8 @@ val inst_ok_less_def = Define`
 
 (* Instructions have distinct targets and read vars -- set by SSA form *)
 val distinct_tar_reg_def = Define`
-  (distinct_tar_reg (Arith (Binop bop r1 r2 ri))
+  (distinct_tar_reg (Arith (Op bop r1 r2 ri))
     ⇔ (r1 ≠ r2 ∧ case ri of (Reg r3) => r1 ≠ r3 | _ => T)) ∧
-  (distinct_tar_reg  (Arith (Shift l r1 r2 n))
-    ⇔ r1 ≠ r2) ∧
   (distinct_tar_reg (Arith (AddCarry r1 r2 r3 r4))
     ⇔ r1 ≠ r2 ∧ r1 ≠ r3 ∧ r1 ≠ r4) ∧
   (distinct_tar_reg _ ⇔ T)`
@@ -2258,9 +2252,7 @@ val distinct_tar_reg_def = Define`
   Currently no two_reg for Mul and Div
 *)
 val two_reg_inst_def = Define`
-  (two_reg_inst (Arith (Binop bop r1 r2 ri))
-    ⇔ (r1 = r2)) ∧
-  (two_reg_inst (Arith (Shift l r1 r2 n))
+  (two_reg_inst (Arith (Op bop r1 r2 ri))
     ⇔ (r1 = r2)) ∧
   (two_reg_inst (Arith (AddCarry r1 r2 r3 r4))
     ⇔ (r1 = r2)) ∧

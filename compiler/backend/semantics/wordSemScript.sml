@@ -9,6 +9,8 @@ val _ = set_grammar_ancestry [
   "lprefix_lub" (* for build_lprefix_lub *)
 ]
 
+val _ = ParseExtras.temp_tight_equality ();
+
 val _ = Datatype `
   word_loc = Word ('a word) | Loc num num `;
 
@@ -146,10 +148,6 @@ val word_exp_def = tDefine "word_exp" `
   (word_exp s (Op op wexps) =
      case the_words (MAP (word_exp s) wexps) of
      | SOME ws => (OPTION_MAP Word (word_op op ws))
-     | _ => NONE) /\
-  (word_exp s (Shift sh wexp nexp) =
-     case word_exp s wexp of
-     | SOME (Word w) => OPTION_MAP Word (word_sh sh w (num_exp nexp))
      | _ => NONE)`
   (WF_REL_TAC `measure (exp_size ARB o SND)`
    \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -200,10 +198,10 @@ val key_val_compare_def = Define `
     let (a:num,b) = x in
     let (a':num,b') = y in
       (a > a') \/
-      (a = a' /\
+      ((a = a') /\
         case b of
           Word x => (case b' of Word y => x <= y | _ => T)
-        | Loc a b => case b' of Loc a' b' => (a>a') \/ (a=a' /\ b>=b') | _ => F)`
+        | Loc a b => case b' of Loc a' b' => (a>a') \/ ((a=a') /\ b>=b') | _ => F)`
 
 (*
 EVAL ``key_val_compare (1,Loc 3 4) (1,Loc 1 2)``
@@ -367,13 +365,10 @@ val inst_def = Define `
     case i of
     | Skip => SOME s
     | Const reg w => assign reg (Const w) s
-    | Arith (Binop bop r1 r2 ri) =>
+    | Arith (Op bop r1 r2 ri) =>
         assign r1
           (Op bop [Var r2; case ri of Reg r3 => Var r3
                                     | Imm w => Const w]) s
-    | Arith (Shift sh r1 r2 n) =>
-        assign r1
-          (Shift sh (Var r2) (Nat n)) s
     | Arith (Div r1 r2 r3) =>
        (let vs = get_vars[r3;r2] s in
        case vs of
@@ -389,7 +384,6 @@ val inst_def = Define `
           let res = w2n l + w2n r + if c = (0w:'a word) then 0 else 1 in
             SOME (set_var r4 (Word (if dimword(:'a) ≤ res then (1w:'a word) else 0w))
                  (set_var r1 (Word (n2w res)) s))
-
         | _ => NONE)
     | Arith (LongMul r1 r2 r3 r4) =>
         (let vs = get_vars [r3;r4] s in
@@ -449,7 +443,7 @@ val add_ret_loc_def = Define `
 
 (*Avoid case split*)
 val bad_dest_args_def = Define`
-  bad_dest_args dest args ⇔ dest = NONE ∧ args = []`
+  bad_dest_args dest args ⇔ ((dest = NONE) ∧ (args = []))`
 
 val termdep_rw = Q.prove(
   `((call_env p_1 s).termdep = s.termdep) /\
@@ -458,8 +452,10 @@ val termdep_rw = Q.prove(
   EVAL_TAC \\ srw_tac[][] \\ full_simp_tac(srw_ss())[]);
 
 val fix_clock_IMP_LESS_EQ = Q.prove(
-  `!x. fix_clock s x = (res,s1) ==> s1.clock <= s.clock /\ s1.termdep = s.termdep`,
-  full_simp_tac(srw_ss())[fix_clock_def,FORALL_PROD] \\ srw_tac[][] \\ full_simp_tac(srw_ss())[] \\ decide_tac);
+  `!x. (fix_clock s x = (res,s1)) ==>
+       s1.clock <= s.clock /\ (s1.termdep = s.termdep)`,
+  full_simp_tac(srw_ss())[fix_clock_def,FORALL_PROD]
+  \\ srw_tac[][] \\ full_simp_tac(srw_ss())[] \\ decide_tac);
 
 val MustTerminate_limit_def = zDefine `
   MustTerminate_limit (:'a) =
@@ -495,7 +491,7 @@ val evaluate_def = tDefine "evaluate" `
      | NONE => (SOME Error, s)
      | SOME x => (NONE, set_var v x s)) /\
   (evaluate (Set v exp,s) =
-     if v = Handler ∨ v = BitmapBase then (SOME Error,s)
+     if (v = Handler) ∨ (v = BitmapBase) then (SOME Error,s)
      else
      case word_exp s exp of
      | NONE => (SOME Error, s)
@@ -619,14 +615,14 @@ val evaluate_ind = theorem"evaluate_ind";
 (* We prove that the clock never increases and that termdep is constant. *)
 
 val gc_clock = Q.store_thm("gc_clock",
-  `!s1 s2. (gc s1 = SOME s2) ==> s2.clock <= s1.clock /\ s2.termdep = s1.termdep`,
+  `!s1 s2. (gc s1 = SOME s2) ==> s2.clock <= s1.clock /\ (s2.termdep = s1.termdep)`,
   full_simp_tac(srw_ss())[gc_def,LET_DEF] \\ SRW_TAC [] []
   \\ every_case_tac >> full_simp_tac(srw_ss())[]
   \\ SRW_TAC [] [] \\ full_simp_tac(srw_ss())[]);
 
 val alloc_clock = Q.store_thm("alloc_clock",
   `!xs s1 vs s2. (alloc x names s1 = (vs,s2)) ==>
-                  s2.clock <= s1.clock /\ s2.termdep = s1.termdep`,
+                  s2.clock <= s1.clock /\ (s2.termdep = s1.termdep)`,
   SIMP_TAC std_ss [alloc_def] \\ rpt gen_tac
   \\ rpt (BasicProvers.TOP_CASE_TAC \\ full_simp_tac(srw_ss())[])
   \\ imp_res_tac gc_clock
@@ -638,7 +634,7 @@ val alloc_clock = Q.store_thm("alloc_clock",
   \\ rpt var_eq_tac \\ full_simp_tac(srw_ss())[]);
 
 val inst_clock = Q.prove(
-  `inst i s = SOME s2 ==> s2.clock <= s.clock /\ s2.termdep = s.termdep`,
+  `(inst i s = SOME s2) ==> s2.clock <= s.clock /\ (s2.termdep = s.termdep)`,
   Cases_on `i` \\ full_simp_tac(srw_ss())[inst_def,assign_def,get_vars_def,LET_THM]
   \\ every_case_tac
   \\ SRW_TAC [] [set_var_def] \\ full_simp_tac(srw_ss())[]
@@ -646,7 +642,7 @@ val inst_clock = Q.prove(
 
 val evaluate_clock = Q.store_thm("evaluate_clock",
   `!xs s1 vs s2. (evaluate (xs,s1) = (vs,s2)) ==>
-                 s2.clock <= s1.clock /\ s2.termdep = s1.termdep`,
+                 s2.clock <= s1.clock /\ (s2.termdep = s1.termdep)`,
   recInduct evaluate_ind \\ REPEAT STRIP_TAC
   \\ POP_ASSUM MP_TAC \\ ONCE_REWRITE_TAC [evaluate_def]
   \\ rpt (disch_then strip_assume_tac)
@@ -660,7 +656,8 @@ val evaluate_clock = Q.store_thm("evaluate_clock",
   \\ imp_res_tac inst_clock \\ full_simp_tac(srw_ss())[]
   \\ full_simp_tac(srw_ss())[mem_store_def,call_env_def,dec_clock_def]
   \\ rpt var_eq_tac \\ full_simp_tac(srw_ss())[]
-  \\ full_simp_tac(srw_ss())[LET_THM] \\ rpt (pairarg_tac \\ full_simp_tac(srw_ss())[])
+  \\ full_simp_tac(srw_ss())[LET_THM]
+  \\ rpt (pairarg_tac \\ full_simp_tac(srw_ss())[])
   \\ full_simp_tac(srw_ss())[jump_exc_def,pop_env_def]
   \\ every_case_tac \\ full_simp_tac(srw_ss())[]
   \\ rpt var_eq_tac \\ full_simp_tac(srw_ss())[]
