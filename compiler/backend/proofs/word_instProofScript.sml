@@ -341,7 +341,6 @@ val binary_branch_exp_def = tDefine "binary_branch_exp" `
   (binary_branch_exp (Op Sub exps) = EVERY (binary_branch_exp) exps) ∧
   (binary_branch_exp (Op op xs) = (LENGTH xs = 2 ∧ EVERY (binary_branch_exp) xs)) ∧
   (binary_branch_exp (Load exp) = binary_branch_exp exp) ∧
-  (binary_branch_exp (Shift shift exp nexp) = binary_branch_exp exp) ∧
   (binary_branch_exp exp = T)`
   (WF_REL_TAC `measure (exp_size ARB)`
    \\ REPEAT STRIP_TAC \\ IMP_RES_TAC MEM_IMP_exp_size
@@ -537,7 +536,7 @@ val inst_select_exp_thm = Q.prove(`
     full_simp_tac(srw_ss())[LET_THM,word_exp_def]>>EVERY_CASE_TAC>>full_simp_tac(srw_ss())[]
     >-
       (`word_sh s' c' (num_exp n) = SOME c'` by
-        (full_simp_tac(srw_ss())[word_sh_def]>>EVERY_CASE_TAC>>
+        (full_simp_tac(srw_ss())[]>>EVERY_CASE_TAC>>
         fs[])>>
       srw_tac[][]>>res_tac>>
       first_assum(qspecl_then[`temp`,`c`] assume_tac)>>
@@ -554,12 +553,12 @@ val inst_select_exp_thm = Q.prove(`
       first_assum(qspecl_then[`temp`,`c`] assume_tac)>>
       full_simp_tac(srw_ss())[evaluate_def,LET_THM,inst_def,mem_load_def,assign_def,word_exp_def]>>
       `lookup temp loc'' = SOME (Word c')` by metis_tac[]>>
-      full_simp_tac(srw_ss())[num_exp_def,set_var_def,state_component_equality,lookup_insert]>>
+      full_simp_tac(srw_ss())[set_var_def,state_component_equality,lookup_insert]>>
       srw_tac[][]>>DISJ2_TAC>>strip_tac>>`x ≠ temp` by DECIDE_TAC>>
       metis_tac[])
     >-
       (`num_exp n ≥ dimindex(:'a)` by DECIDE_TAC>>
-      full_simp_tac(srw_ss())[word_sh_def])))
+      full_simp_tac(srw_ss())[])))
 
 val locals_rm = Q.prove(`
   D with locals := D.locals = D`,
