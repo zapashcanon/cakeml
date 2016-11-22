@@ -403,6 +403,20 @@ val inst_def = Define `
            SOME (set_var r1 (Word (n2w q)) (set_var r2 (Word (n2w (n MOD d))) s))
          else NONE
       | _ => NONE)
+    | Arith (AddOverflow r1 r2 r3 r4) =>
+       (let vs = get_vars [r2;r3] s in
+       case vs of
+       SOME [Word w2;Word w3] =>
+         SOME (set_var r4 (Word (if w2i (w2 + w3) <> w2i w2 + w2i w3 then 1w else 0w))
+                (set_var r1 (Word (w2 + w3)) s))
+      | _ => NONE)
+    | Arith (SubOverflow r1 r2 r3 r4) =>
+       (let vs = get_vars [r2;r3] s in
+       case vs of
+       SOME [Word w2;Word w3] =>
+         SOME (set_var r4 (Word (if w2i (w2 - w3) <> w2i w2 - w2i w3 then 1w else 0w))
+                (set_var r1 (Word (w2 - w3)) s))
+      | _ => NONE)
     | Mem Load r (Addr a w) =>
        (case word_exp s (Op Add [Var a; Const w]) of
         | SOME (Word w) =>

@@ -1803,7 +1803,7 @@ val every_var_mono = Q.store_thm("every_var_mono",`
   TRY(Cases_on`ret`>>full_simp_tac(srw_ss())[]>>PairCases_on`x`>>Cases_on`h`>>full_simp_tac(srw_ss())[]>>TRY(Cases_on`x`)>>full_simp_tac(srw_ss())[])>>
   TRY(Cases_on`r`>>full_simp_tac(srw_ss())[])>>
   TRY(Cases_on`ri`>>full_simp_tac(srw_ss())[every_var_imm_def])>>
-  metis_tac[EVERY_MONOTONIC,every_var_inst_mono,every_var_exp_mono,every_name_mono])
+  metis_tac[EVERY_MONOTONIC,every_var_inst_mono,every_var_exp_mono,every_name_mono]);
 
 (*Conjunct*)
 val every_var_inst_conj = Q.store_thm("every_var_inst_conj",`
@@ -1812,7 +1812,7 @@ val every_var_inst_conj = Q.store_thm("every_var_inst_conj",`
   every_var_inst (λx. P x ∧ Q x) inst`,
   ho_match_mp_tac every_var_inst_ind>>srw_tac[][every_var_inst_def]>>
   TRY(Cases_on`ri`>>full_simp_tac(srw_ss())[every_var_imm_def])>>
-  metis_tac[])
+  metis_tac[]);
 
 val every_var_exp_conj = Q.store_thm("every_var_exp_conj",`
   ∀P exp Q.
@@ -1820,14 +1820,14 @@ val every_var_exp_conj = Q.store_thm("every_var_exp_conj",`
   every_var_exp (λx. P x ∧ Q x) exp`,
   ho_match_mp_tac every_var_exp_ind>>srw_tac[][every_var_exp_def]>>
   full_simp_tac(srw_ss())[EVERY_MEM]>>
-  metis_tac[])
+  metis_tac[]);
 
 val every_name_conj = Q.store_thm("every_name_conj",`
   ∀P names Q.
   every_name P names ∧ every_name Q names ⇔
   every_name (λx. P x ∧ Q x) names`,
   srw_tac[][every_name_def]>>
-  metis_tac[EVERY_CONJ])
+  metis_tac[EVERY_CONJ]);
 
 val every_var_conj = Q.store_thm("every_var_conj",`
   ∀P prog Q.
@@ -1839,7 +1839,7 @@ val every_var_conj = Q.store_thm("every_var_conj",`
   TRY(Cases_on`x`>>full_simp_tac(srw_ss())[])>>
   TRY(Cases_on`r`>>full_simp_tac(srw_ss())[])>>
   TRY(Cases_on`ri`>>full_simp_tac(srw_ss())[every_var_imm_def])>>
-  TRY(metis_tac[EVERY_CONJ,every_var_inst_conj,every_var_exp_conj,every_name_conj]))
+  TRY(metis_tac[EVERY_CONJ,every_var_inst_conj,every_var_exp_conj,every_name_conj]));
 
 (*Similar lemmas about every_stack_var*)
 val every_var_imp_every_stack_var = Q.store_thm("every_var_imp_every_stack_var",`
@@ -1850,7 +1850,7 @@ val every_var_imp_every_stack_var = Q.store_thm("every_var_imp_every_stack_var",
   Cases_on`ret`>>
   Cases_on`h`>>full_simp_tac(srw_ss())[]>>
   PairCases_on`x`>>full_simp_tac(srw_ss())[]>>
-  Cases_on`x'`>>Cases_on`r`>>full_simp_tac(srw_ss())[])
+  Cases_on`x'`>>Cases_on`r`>>full_simp_tac(srw_ss())[]);
 
 val every_stack_var_mono = Q.store_thm("every_stack_var_mono",`
   ∀P prog Q.
@@ -1860,7 +1860,7 @@ val every_stack_var_mono = Q.store_thm("every_stack_var_mono",`
   every_stack_var Q prog`,
   ho_match_mp_tac every_stack_var_ind>>srw_tac[][every_stack_var_def]>>
   TRY(Cases_on`ret`>>full_simp_tac(srw_ss())[]>>PairCases_on`x`>>Cases_on`h`>>full_simp_tac(srw_ss())[]>>TRY(Cases_on`x`>>Cases_on`r`>>full_simp_tac(srw_ss())[]))>>
-  metis_tac[every_name_mono])
+  metis_tac[every_name_mono]);
 
 val every_stack_var_conj = Q.store_thm("every_stack_var_conj",`
   ∀P prog Q.
@@ -1870,11 +1870,11 @@ val every_stack_var_conj = Q.store_thm("every_stack_var_conj",`
   TRY(Cases_on`ret`>>full_simp_tac(srw_ss())[])>>
   TRY(PairCases_on`x`>>Cases_on`h`>>full_simp_tac(srw_ss())[])>>
   TRY(Cases_on`x`>>Cases_on`r`>>full_simp_tac(srw_ss())[])>>
-  TRY(metis_tac[EVERY_CONJ,every_name_conj]))
+  TRY(metis_tac[EVERY_CONJ,every_name_conj]));
 
 (* Locals extend lemma *)
 val locals_rel_def = Define`
-  locals_rel temp (s:'a word_loc num_map) t ⇔ (∀x. x < temp ⇒ lookup x s = lookup x t)`
+  locals_rel temp (s:'a word_loc num_map) t ⇔ (∀x. x < temp ⇒ lookup x s = lookup x t)`;
 
 val the_words_EVERY_IS_SOME = Q.store_thm("the_words_EVERY_IS_SOME",
   `∀ls x.
@@ -1882,7 +1882,7 @@ val the_words_EVERY_IS_SOME = Q.store_thm("the_words_EVERY_IS_SOME",
   EVERY IS_SOME ls`,
   Induct>>fs[]>>Cases>>fs[the_words_def]>>
   TOP_CASE_TAC>>fs[]>>
-  TOP_CASE_TAC>>fs[])
+  TOP_CASE_TAC>>fs[]);
 
 val locals_rel_word_exp = Q.store_thm("locals_rel_word_exp",`
   ∀s exp w.
@@ -1910,7 +1910,7 @@ val locals_rel_word_exp = Q.store_thm("locals_rel_word_exp",`
       fs[IS_SOME_EXISTS])>>
     fs[])
   >>
-    every_case_tac>>res_tac>>full_simp_tac(srw_ss())[])
+    every_case_tac>>res_tac>>full_simp_tac(srw_ss())[]);
 
 val locals_rel_get_vars  = Q.store_thm("locals_rel_get_vars",`
   ∀ls vs.
@@ -1922,7 +1922,7 @@ val locals_rel_get_vars  = Q.store_thm("locals_rel_get_vars",`
   qpat_x_assum`A=SOME vs` mp_tac>>ntac 2 full_case_tac>>srw_tac[][]>>
   res_tac>>full_simp_tac(srw_ss())[get_var_def,locals_rel_def]>>
   res_tac>>
-  full_simp_tac(srw_ss())[])
+  full_simp_tac(srw_ss())[]);
 
 val locals_rel_alist_insert = Q.store_thm("locals_rel_alist_insert",`
   ∀ls vs s t.
@@ -1931,7 +1931,7 @@ val locals_rel_alist_insert = Q.store_thm("locals_rel_alist_insert",`
   locals_rel temp (alist_insert ls vs s) (alist_insert ls vs t)`,
   ho_match_mp_tac alist_insert_ind>>full_simp_tac(srw_ss())[alist_insert_def,locals_rel_def]>>
   srw_tac[][]>>
-  Cases_on`x'=ls`>>full_simp_tac(srw_ss())[lookup_insert])
+  Cases_on`x'=ls`>>full_simp_tac(srw_ss())[lookup_insert]);
 
 val locals_rel_get_var = Q.store_thm("locals_rel_get_var",`
   r < temp ∧
@@ -1939,7 +1939,7 @@ val locals_rel_get_var = Q.store_thm("locals_rel_get_var",`
   locals_rel temp st.locals loc ⇒
   get_var r (st with locals:=loc) = SOME x`,
   full_simp_tac(srw_ss())[get_var_def,locals_rel_def]>>
-  metis_tac[])
+  metis_tac[]);
 
 val locals_rel_get_var_imm = Q.store_thm("locals_rel_get_var_imm",`
   every_var_imm (λx.x<temp) r ∧
@@ -1947,13 +1947,13 @@ val locals_rel_get_var_imm = Q.store_thm("locals_rel_get_var_imm",`
   locals_rel temp st.locals loc ⇒
   get_var_imm r (st with locals:=loc) = SOME x`,
   Cases_on`r`>>full_simp_tac(srw_ss())[get_var_imm_def,every_var_imm_def]>>
-  metis_tac[locals_rel_get_var])
+  metis_tac[locals_rel_get_var]);
 
 val locals_rel_set_var = Q.prove(`
   ∀n s t.
   locals_rel temp s t ⇒
   locals_rel temp (insert n v s) (insert n v t)`,
-  srw_tac[][]>>full_simp_tac(srw_ss())[locals_rel_def,lookup_insert])
+  srw_tac[][]>>full_simp_tac(srw_ss())[locals_rel_def,lookup_insert]);
 
 val locals_rel_cut_env = Q.prove(`
   locals_rel temp loc loc' ∧
@@ -1966,12 +1966,12 @@ val locals_rel_cut_env = Q.prove(`
   >>
   full_simp_tac(srw_ss())[lookup_inter]>>srw_tac[][]>>every_case_tac>>
   full_simp_tac(srw_ss())[domain_lookup]>>res_tac>>
-  metis_tac[option_CLAUSES])
+  metis_tac[option_CLAUSES]);
 
 (*Extra temporaries not mentioned in program
   do not affect evaluation*)
 
-val srestac = qpat_x_assum`A=res`sym_sub_tac>>full_simp_tac(srw_ss())[]
+val srestac = qpat_x_assum`A=res`sym_sub_tac>>full_simp_tac(srw_ss())[];
 
 val locals_rel_evaluate_thm = Q.store_thm("locals_rel_evaluate_thm",`
   ∀prog st res rst loc temp.
@@ -2006,8 +2006,7 @@ val locals_rel_evaluate_thm = Q.store_thm("locals_rel_evaluate_thm",`
       imp_res_tac locals_rel_set_var>>
       full_simp_tac(srw_ss())[state_component_equality]>>
       srestac>>metis_tac[])
-    >-
-      (reverse (Cases_on`a`)>>fs[assign_def,LET_THM]>>
+    >- (reverse (Cases_on`a`)>>fs[assign_def,LET_THM]>>
       qpat_x_assum`A=(res,rst)` mp_tac>>
       TRY (* everything not special*)
         (qpat_abbrev_tac`ls = A:num list`>>

@@ -48,12 +48,16 @@ val reg_imm_def = Define `
   (reg_imm (Imm w) s = Word w)`
 val _ = export_rewrites["reg_imm_def"];
 
-val binop_upd_def = Define `
-  (binop_upd r Add w1 w2 = upd_reg r (Word (w1 + w2))) /\
-  (binop_upd r Sub w1 w2 = upd_reg r (Word (w1 - w2))) /\
-  (binop_upd r And w1 w2 = upd_reg r (Word (word_and w1 w2))) /\
-  (binop_upd r Or  w1 w2 = upd_reg r (Word (word_or w1 w2))) /\
-  (binop_upd r Xor w1 w2 = upd_reg r (Word (word_xor w1 w2)))`
+val op_upd_def = Define `
+  (op_upd r Add w1 w2 = upd_reg r (Word (w1 + w2))) /\
+  (op_upd r Sub w1 w2 = upd_reg r (Word (w1 - w2))) /\
+  (op_upd r And w1 w2 = upd_reg r (Word (word_and w1 w2))) /\
+  (op_upd r Or  w1 w2 = upd_reg r (Word (word_or w1 w2))) /\
+  (op_upd r Xor w1 w2 = upd_reg r (Word (word_xor w1 w2))) /\
+  (op_upd r Not w1 _  = upd_reg r (Word (word_1comp w1))) /\
+  (op_upd r Lsl w1 w2 = upd_reg r (Word (word_lsl w1 (w2n w2)))) /\
+  (op_upd r Lsr w1 w2 = upd_reg r (Word (word_lsr w1 (w2n w2)))) /\
+  (op_upd r Asr w1 w2 = upd_reg r (Word (word_asr w1 (w2n w2))))`
 
 val word_cmp_def = Define `
   (word_cmp Equal    (Word w1) (Word w2) = SOME (w1 = w2)) /\
@@ -69,14 +73,10 @@ val word_cmp_def = Define `
   (word_cmp _ _ _ = NONE)`
 
 val arith_upd_def = Define `
-  (arith_upd (Binop b r1 r2 (ri:'a reg_imm)) s =
+  (arith_upd (Op b r1 r2 (ri:'a reg_imm)) s =
      case (read_reg r2 s, reg_imm ri s) of
-     | (Word w1, Word w2) => binop_upd r1 b w1 w2 s
+     | (Word w1, Word w2) => op_upd r1 b w1 w2 s
      | (x,_) => if b = Or /\ ri = Reg r2 then upd_reg r1 x s else assert F s) /\
-  (arith_upd (Shift l r1 r2 n) s =
-     case read_reg r2 s of
-     | Word w1 => upd_reg r1 (Word (word_shift l w1 n)) s
-     | _ => assert F s) /\
   (arith_upd (Div r1 r2 r3) s =
      case (read_reg r3 s,read_reg r2 s) of
      | (Word q,Word w2) =>
@@ -106,6 +106,20 @@ val arith_upd_def = Define `
        let q = n DIV d in
        assert (d ≠ 0 ∧ q < dimword(:'a))
          (upd_reg r1 (Word (n2w q)) (upd_reg r2 (Word (n2w (n MOD d))) s))
+     | _ => assert F s)
+     /\
+  (arith_upd (AddOverflow r1 r2 r3 r4) s =
+     case (read_reg r2 s, read_reg r3 s) of
+     | (Word w2, Word w3) =>
+         upd_reg r4 (Word (if w2i (w2 + w3) <> w2i w2 + w2i w3 then 1w else 0w))
+           (upd_reg r1 (Word (w2 + w3)) s)
+     | _ => assert F s)
+     /\
+  (arith_upd (SubOverflow r1 r2 r3 r4) s =
+     case (read_reg r2 s, read_reg r3 s) of
+     | (Word w2, Word w3) =>
+         upd_reg r4 (Word (if w2i (w2 - w3) <> w2i w2 - w2i w3 then 1w else 0w))
+           (upd_reg r1 (Word (w2 - w3)) s)
      | _ => assert F s)`
 
 val addr_def = Define `
@@ -221,8 +235,8 @@ val asm_inst_consts = Q.store_thm("asm_inst_consts",
   Cases_on `i` \\ fs [asm_inst_def,upd_reg_def,arith_upd_def]
   \\ TRY (Cases_on `a`)
   \\ fs [asm_inst_def,upd_reg_def,arith_upd_def]
-  \\ BasicProvers.EVERY_CASE_TAC \\ TRY (Cases_on `b`)
-  \\ fs [binop_upd_def,upd_reg_def,assert_def] \\ Cases_on `m`
+  \\ BasicProvers.EVERY_CASE_TAC \\ TRY (Cases_on `b`) \\ TRY (Cases_on `o'`)
+  \\ fs [op_upd_def,upd_reg_def,assert_def] \\ TRY (Cases_on `m`)
   \\ fs [mem_op_def,mem_load_def,LET_DEF,mem_load_byte_def,upd_mem_def,
          assert_def,upd_reg_def,mem_store_def,mem_store_byte_def,
          mem_store_byte_aux_def,addr_def]

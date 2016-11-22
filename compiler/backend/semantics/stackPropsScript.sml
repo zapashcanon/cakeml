@@ -471,12 +471,9 @@ val reg_imm_name_def = Define`
   (reg_imm_name b (Imm w) c ⇔ c.valid_imm b w)`
 
 val arith_name_def = Define`
-  (arith_name (Binop b r1 r2 ri) (c:'a asm_config) ⇔
+  (arith_name (Op b r1 r2 ri) (c:'a asm_config) ⇔
     (c.two_reg_arith ⇒ r1 = r2 ∨ b = Or ∧ ri = Reg r2) ∧ reg_name r1 c ∧
     reg_name r2 c ∧ reg_imm_name (INL b) ri c) ∧
-  (arith_name (Shift l r1 r2 n) c ⇔
-    (c.two_reg_arith ⇒ r1 = r2) ∧ reg_name r1 c ∧ reg_name r2 c ∧
-    (n = 0 ⇒ l = Lsl) ∧ n < dimindex (:α)) ∧
   (arith_name (Div r1 r2 r3) c ⇔
     (reg_name r1 c ∧ reg_name r2 c ∧ reg_name r3 c ∧
     c.ISA ∈ {ARMv8; MIPS; RISC_V})) ∧

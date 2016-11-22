@@ -16,7 +16,7 @@ val asm_inst_with_clock = Q.store_thm("asm_inst_with_clock[simp]",
   Cases_on`i`>>EVAL_TAC >- (
     Cases_on`a`>>EVAL_TAC >>
     every_case_tac >> fs[] >>
-    Cases_on`b`>>EVAL_TAC>>
+    Cases_on`o'`>>EVAL_TAC>>
     fs[state_component_equality] >>
     Cases_on`r`>>fs[reg_imm_def]) >>
   Cases_on`m`>>EVAL_TAC>>
@@ -71,17 +71,17 @@ val update_simps = Q.store_thm("update_simps[simp]",
     ((labSem$inc_pc s).ffi = s.ffi)`,
   EVAL_TAC);
 
-val binop_upd_consts = Q.store_thm("binop_upd_consts[simp]",
-  `(labSem$binop_upd a b c d x).mem_domain = x.mem_domain ∧
-   (labSem$binop_upd a b c d x).ptr_reg = x.ptr_reg ∧
-   (labSem$binop_upd a b c d x).len_reg = x.len_reg ∧
-   (labSem$binop_upd a b c d x).link_reg = x.link_reg ∧
-   (labSem$binop_upd a b c d x).code = x.code ∧
-   (labSem$binop_upd a b c d x).be = x.be ∧
-   (labSem$binop_upd a b c d x).mem = x.mem ∧
-   (labSem$binop_upd a b c d x).io_regs = x.io_regs ∧
-   (labSem$binop_upd a b c d x).pc = x.pc ∧
-   (labSem$binop_upd a b c d x).ffi = x.ffi`,
+val op_upd_consts = Q.store_thm("op_upd_consts[simp]",
+  `(labSem$op_upd a b c d x).mem_domain = x.mem_domain ∧
+   (labSem$op_upd a b c d x).ptr_reg = x.ptr_reg ∧
+   (labSem$op_upd a b c d x).len_reg = x.len_reg ∧
+   (labSem$op_upd a b c d x).link_reg = x.link_reg ∧
+   (labSem$op_upd a b c d x).code = x.code ∧
+   (labSem$op_upd a b c d x).be = x.be ∧
+   (labSem$op_upd a b c d x).mem = x.mem ∧
+   (labSem$op_upd a b c d x).io_regs = x.io_regs ∧
+   (labSem$op_upd a b c d x).pc = x.pc ∧
+   (labSem$op_upd a b c d x).ffi = x.ffi`,
   Cases_on`b`>>EVAL_TAC);
 
 val arith_upd_consts = Q.store_thm("arith_upd_consts[simp]",
@@ -346,9 +346,9 @@ val upd_mem_align_dm = Q.store_thm("upd_mem_align_dm[simp]",
   `upd_mem x y (align_dm s) = align_dm (upd_mem x y s)`,
   EVAL_TAC);
 
-val binop_upd_align_dm = Q.store_thm("binop_upd_align_dm[simp]",
-  `binop_upd x y z w (align_dm s) = align_dm (binop_upd x y z w s)`,
-  Cases_on`y` \\ simp[binop_upd_def]);
+val op_upd_align_dm = Q.store_thm("op_upd_align_dm[simp]",
+  `op_upd x y z w (align_dm s) = align_dm (op_upd x y z w s)`,
+  Cases_on`y` \\ simp[op_upd_def]);
 
 val reg_imm_align_dm = Q.store_thm("reg_imm_align_dm[simp]",
   `reg_imm r (align_dm s) = reg_imm r s`,

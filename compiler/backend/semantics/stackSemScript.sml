@@ -114,11 +114,7 @@ val word_exp_def = tDefine "word_exp" `
      | _ => NONE) /\
   (word_exp s (Op op wexps) =
      let ws = MAP (word_exp s) wexps in
-       if EVERY IS_SOME ws then word_op op (MAP THE ws) else NONE) /\
-  (word_exp s (Shift sh wexp nexp) =
-     case word_exp s wexp of
-     | NONE => NONE
-     | SOME w => word_sh sh w (num_exp nexp))`
+       if EVERY IS_SOME ws then word_op op (MAP THE ws) else NONE)`
   (WF_REL_TAC `measure (exp_size ARB o SND)`
    \\ REPEAT STRIP_TAC \\ IMP_RES_TAC wordLangTheory.MEM_IMP_exp_size
    \\ TRY (FIRST_X_ASSUM (ASSUME_TAC o Q.SPEC `ARB`))
@@ -241,7 +237,7 @@ val inst_def = Define `
     case i of
     | Skip => SOME s
     | Const reg w => assign reg (Const w) s
-    | Arith (Binop bop r1 r2 ri) =>
+    | Arith (Op bop r1 r2 ri) =>
         if bop = Or /\ ri = Reg r2 then
           case FLOOKUP s.regs r2 of
           | NONE => NONE
@@ -250,9 +246,6 @@ val inst_def = Define `
           assign r1
             (Op bop [Var r2; case ri of Reg r3 => Var r3
                                       | Imm w => Const w]) s
-    | Arith (Shift sh r1 r2 n) =>
-        assign r1
-          (Shift sh (Var r2) (Nat n)) s
     | Arith (Div r1 r2 r3) =>
        (let vs = get_vars[r3;r2] s in
        case vs of
@@ -287,6 +280,20 @@ val inst_def = Define `
          if (d ≠ 0 ∧ q < dimword(:'a)) then
            SOME (set_var r1 (Word (n2w q)) (set_var r2 (Word (n2w (n MOD d))) s))
          else NONE
+      | _ => NONE)
+    | Arith (AddOverflow r1 r2 r3 r4) =>
+       (let vs = get_vars [r2;r3] s in
+       case vs of
+       SOME [Word w2;Word w3] =>
+         SOME (set_var r4 (Word (if w2i (w2 + w3) <> w2i w2 + w2i w3 then 1w else 0w))
+                (set_var r1 (Word (w2 + w3)) s))
+      | _ => NONE)
+    | Arith (SubOverflow r1 r2 r3 r4) =>
+       (let vs = get_vars [r2;r3] s in
+       case vs of
+       SOME [Word w2;Word w3] =>
+         SOME (set_var r4 (Word (if w2i (w2 - w3) <> w2i w2 - w2i w3 then 1w else 0w))
+                (set_var r1 (Word (w2 - w3)) s))
       | _ => NONE)
     | Mem Load r (Addr a w) =>
        (case word_exp s (Op Add [Var a; Const w]) of
