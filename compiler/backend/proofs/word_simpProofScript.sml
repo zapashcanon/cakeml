@@ -219,10 +219,7 @@ val const_fp_exp_word_exp_thm = Q.store_thm("const_fp_exp_word_exp",
    (MAP (\a. word_exp s a) args)` by (fs [] \\ fs [MAP_MAP_o, MAP_EQ_f]) \\ fs [] \\
   `MAP (\a. word_exp s a) args = MAP (SOME o Word) x` by metis_tac [strip_const_thm] \\
   fs [the_words_thm] \\ CASE_TAC \\ fs [word_exp_def] \\
-  rw [MAP_MAP_o, o_DEF, word_exp_def, SIMP_RULE std_ss [o_DEF] the_words_thm])
-  >-
-  (CASE_TAC \\ CASE_TAC \\ rw [word_exp_def] \\ every_case_tac \\
-  res_tac \\ qpat_x_assum `_ = word_exp s e` (assume_tac o GSYM) \\ fs [word_exp_def]));
+  rw [MAP_MAP_o, o_DEF, word_exp_def, SIMP_RULE std_ss [o_DEF] the_words_thm]));
 
 val const_fp_exp_word_exp_const_thm = Q.store_thm("const_fp_exp_word_exp_const",
   `!e cs s c. (!v w. lookup v cs = SOME w ==> get_var v s = SOME (Word w)) /\
@@ -241,10 +238,6 @@ val const_fp_exp_word_exp_const_thm = Q.store_thm("const_fp_exp_word_exp_const",
   asm_rewrite_tac [] \\ imp_res_tac strip_const_thm \\
   last_x_assum (qspec_then `s` assume_tac) \\ asm_rewrite_tac [] \\
   rw [the_words_thm])
-
-  >- (* Shift *)
-  (every_case_tac \\ rw [word_exp_def] \\ res_tac \\
-  qpat_x_assum `!c. _` (qspec_then `c'` assume_tac) \\ fs [])
 
   >- (* Others *)
   (rw [word_exp_def]));
