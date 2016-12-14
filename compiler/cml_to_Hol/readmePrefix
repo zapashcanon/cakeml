@@ -1,0 +1,4 @@
+A tool generating Hol definitions from cakeML syntax
+- astToAbsyn: Translation of cakeML ast to Hol's abstract syntax
+- parserProg: cakeML parser in SML, translated from the HOL
+- test: Temporary testing file
