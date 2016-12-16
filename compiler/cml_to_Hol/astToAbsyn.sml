@@ -234,9 +234,46 @@ fun absynFromDec d = case d of
   | Dtabbrev (tl, name, t) => raise NotSupported "type abbrev"
   | Dexn (name, tl) => raise NotSupported "Exceptions";
 
-fun absynFromTop t = 
+(* TODO: in separate module? *)
+
+(* definition of Define in TotalDefn *) 
+local
+val ERRloc = mk_HOL_ERRloc "TotalDefn";
+   fun msg alist invoc =
+      String.concat
+        ["Definition failed! Can't make name for storing definition\n",
+         "because there is no alphanumeric identifier in: \n\n   ",
+         wfrecUtils.list_to_string Lib.quote "," alist,
+         ".\n\nTry \"",invoc, "\" instead.\n\n"]
+   fun mk_bindstem exn invoc alist =
+      Lib.first Lexis.ok_identifier alist
+      handle HOL_ERR _ => (Lib.say (msg alist invoc); raise exn)
+in
+   fun absynDefine a =
+      let
+         val locn = Absyn.locn_of_absyn a
+         val (tm,names) = Defn.parse_absyn a
+         val bindstem =
+            mk_bindstem (ERRloc "Define" locn "") "Define <quotation>" names
+      in
+         #1 (TotalDefn.primDefine (Defn.mk_defn bindstem tm))
+         handle e => raise (wrap_exn_loc "TotalDefn" "Define" locn e)
+      end
+end
+
+(* TODO: use Hol_defn instead
+*       and tell the user to use Defn.tgoal or Defn.tprove *)
+
+fun defineFromTop t = 
   case t of
-       Tmod name => raise NotSupported "open modules"
-     | Tdec d => absynFromDec d;
+(* TODO: new theory "name", ignore spec(?), containing declarations decs *)
+       Tmod (name, SOME _ , decs) => raise NotSupported "Module signatures"
+     | Tmod (name, NONE, decs) => 
+            (new_theory (String.implode name);
+            (* TODO give names *)
+             map (absynDefine o absynFromDec) decs;
+             export_theory())
+     | Tdec d => (absynDefine(absynFromDec d); ());
 
 end
+
