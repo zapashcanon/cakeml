@@ -1,5 +1,5 @@
 open HolKernel TermParse astTheory Preterm
-open locn libTheory parserProg Absyn GrammarSpecials 
+open locn libTheory parserProg Absyn GrammarSpecials Pretype
 
 structure astToAbsyn =
 struct
@@ -61,7 +61,6 @@ fun absynOfId i = case i of
   | Long (m, s) => QIDENT(Loc_Unknown, String.implode m, s);
 
 (*
-
 val _ = Hol_datatype `
  word_size = W8 | W64`;
 *)
@@ -113,44 +112,46 @@ fun absynFromOp opn = case opn of
 
 
 
-(*
 
 
-(* Type constructors. TODO
- * 0-ary type applications represent unparameterised types (e.g., num or string)
- *)
-val _ = Hol_datatype `
- tctor =
-  (* User defined types *)
-    TC_name of typeN id
-  (* Built-in types *)
-  | TC_int
-  | TC_char
-  | TC_string
-  | TC_ref
-  | TC_word8
-  | TC_word64
-  | TC_word8array
-  | TC_fn
-  | TC_tup
-  | TC_exn
-  | TC_vector
-  | TC_array`;
-*)
+(* Type constructors. *)
+fun pretypeFromTctor tc tl = case tc of
+(* what TODO if tname = int ...? *)
+    Tc_name (Long(m, tname)) => 
+        Tyop{Thy = String.implode m, Tyop = (String.implode tname), Args= tl}
+  | Tc_name (Short tname) => 
+        Tyop{Thy ="", Tyop = String.implode(tname), Args= tl}
+  | Tc_int => 
+        Tyop{Thy ="integer", Tyop = "nat", Args= tl}
+  | Tc_char => 
+        Tyop{Thy ="string", Tyop ="char", Args= tl}
+  | Tc_string => 
+        Tyop{Thy ="list", Tyop ="list", Args= [Tyop{Thy = "string", 
+                                                Tyop = "char", 
+                                                Args = tl}]}
+  | Tc_fn =>
+        Tyop{Thy ="min", Tyop ="fun", Args= tl}
+  | Tc_tup => 
+      (case tl of
+            [] => raise NotSupported "Empty tuple"
+          | h :: t => foldr (fn a => fn b => Tyop{Thy="pair", 
+                                                  Tyop="prod", 
+                                                  Args=[a, b]})
+                            h t)
+  | Tc_ref =>  raise NotSupported "Reference type"
+  | Tc_word8 =>  raise NotSupported "Word8 type"
+  | Tc_word64 =>  raise NotSupported "Word64 type"
+  | Tc_word8array =>  raise NotSupported "Word8 Array type"
+  | Tc_exn => raise NotSupported "Exception type"
+  | Tc_vector =>  raise NotSupported "Vector type"
+  | Tc_array =>  raise NotSupported "Array type";
 
-(*
-
-
-(* Types TODO *)
-val _ = Hol_datatype `
- t =
+(* Types *)
+fun pretypeFromType t = case t of
   (* Type variables that the user writes down ('a, 'b, etc.) *)
-    Tvar of tvarN
-  (* deBruijn indexed type variables.
-     The type system uses these internally. *)
-  | Tvar_db of num
-  | Tapp of t list => tctor`;
-*)
+    Tvar tn => Vartype (String.implode tn)
+  | Tapp (tl, tc) => pretypeFromTctor tc (map pretypeFromType tl)
+  | Tvar_db n => raise NotSupported "DeBruijn Type"; (* only used internally *)
 
 fun absynFromId i = case i of
   Long (m, name) => QIDENT(Loc_Unknown,String.implode m, String.implode name)
@@ -166,7 +167,6 @@ fun absynFromPat p = case p of
 	| SOME c => list_mk_app(absynFromId c, map absynFromPat pl))
   | Pref r => raise NotSupported "pattern reference"
   | Ptannot (p, t) => absynFromPat p; (* TODO type annotation *)
-
 
 fun mk_absynLet(id, ab1, ab2) = 
   mk_app(mk_app(mk_ident "LET", mk_lam(mk_vident id, ab2)), ab1);
@@ -210,21 +210,19 @@ fun absynFromExp e =  case e of
 		(case v of
 		   NONE => mk_pair(absynFromExp e1, absynFromExp e2)
 		 | SOME cl => mk_absynLet(cl, absynFromExp e1, absynFromExp e2))
-(* TODO: not sure about the way we want to translate it *)
   | Letrec (l, e) => 
       let fun mklet (f,(x,ef)) e = 
             mk_absynLet(f, mk_lam(mk_vident x, absynFromExp ef), e)
       in
           foldr mklet (absynFromExp e) l 
       end
-  | Tannot (e, t) => absynFromExp e; (* TODO Type annotations*)
+  | Tannot (e, t) => mk_typed(absynFromExp e, pretypeFromType t); 
 
 (* Declarations *)
 fun absynFromDec d = case d of
 (* may be meaningless if p is a tuple *)
     Dlet (p, e) => mk_eq(absynFromPat p, absynFromExp e)
  (* Mutually recursive function definition *)
-(* TODO: translate as Define ... bunch of equations *)
   | Dletrec l => (* get definition name from fst hd *)
   		list_mk_conj 
 			(map (fn (f, (x, e)) => 
