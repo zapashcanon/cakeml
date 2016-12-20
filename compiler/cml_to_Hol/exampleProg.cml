@@ -1,0 +1,20 @@
+val x  = let val y = 3 in 4 end;
+
+val main = let fun f x = 0 in f #"c" end; 
+
+fun main2 x = let fun g y = y in g x end;  
+
+fun main3 x = case x of 
+                   0 => 0 
+                 | 1 => 1 
+                 | _ => 2; 
+
+fun main5 f x y z = f x y (main3 z); 
+
+fun main6 x y = (x, y) : (int -> int list) * integer.int; 
+
+fun main7 x = ((x : bool) :: [] = [x] @ [x]) orelse false;
+
+(* fun fib n = if n = 0 orelse n = 1 then n else fib (n-1) + fib (n-2);
+    non-trivial termination proof *)
+
