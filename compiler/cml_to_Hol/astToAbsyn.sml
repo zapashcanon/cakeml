@@ -33,7 +33,7 @@ fun absynFromOpn opb = case opb of
   | Minus => "-"
   | Times => "*"
   | Divide => "/"
-  | Modulo => "%"; (*TODO: check *)
+  | Modulo => "%"; 
 
 fun abynFromOpb opb = case opb of
 	Lt => "<"
@@ -112,17 +112,24 @@ fun absynFromOp opn = case opn of
 
 
 
-
-
 (* Type constructors. *)
 fun pretypeFromTctor tc tl = case tc of
-(* what TODO if tname = int ...? *)
     Tc_name (Long(m, tname)) => 
         Tyop{Thy = String.implode m, Tyop = (String.implode tname), Args= tl}
-  | Tc_name (Short tname) => 
-        Tyop{Thy ="", Tyop = String.implode(tname), Args= tl}
+  | Tc_name (Short tname) =>
+      let val name = String.implode(tname) 
+        fun mk_dummy_prod l = 
+          if l = [] then "" 
+          else "(" ^ String.concatWith ", " (map (fn _ => "'a") l) ^ ")"         
+      in
+        (case Pretype.fromType(Parse.Type [QUOTE (":" ^ mk_dummy_prod tl ^ name)]) of
+              Tyop{Thy = tthy, Tyop = ttyop, Args = _} => 
+                Tyop{Thy = tthy, Tyop = ttyop, Args = tl} 
+            | _ => raise NotSupported "Should not happen")
+        handle _ => Tyop{Thy ="", Tyop = name, Args= tl}
+      end
   | Tc_int => 
-        Tyop{Thy ="integer", Tyop = "nat", Args= tl}
+        Tyop{Thy ="integer", Tyop = "int", Args= tl}
   | Tc_char => 
         Tyop{Thy ="string", Tyop ="char", Args= tl}
   | Tc_string => 
@@ -155,7 +162,15 @@ fun pretypeFromType t = case t of
 
 fun absynFromId i = case i of
   Long (m, name) => QIDENT(Loc_Unknown,String.implode m, String.implode name)
-| Short name => mk_ident(String.implode name)
+| Short name => 
+    mk_ident (case String.implode name of
+                   "true" => "T"
+                 | "false" => "F"
+                 | "[]" => "NIL"
+                 | "nil" => "NIL"
+                 | "::" => "CONS"
+                 | "@" => "++"
+                 | iname => iname) 
 
 (* Patterns *)
 fun absynFromPat p = case p of
@@ -166,7 +181,7 @@ fun absynFromPat p = case p of
 	  NONE => list_mk_pair(map absynFromPat pl)
 	| SOME c => list_mk_app(absynFromId c, map absynFromPat pl))
   | Pref r => raise NotSupported "pattern reference"
-  | Ptannot (p, t) => absynFromPat p; (* TODO type annotation *)
+  | Ptannot (p, t) => mk_typed(absynFromPat p, pretypeFromType t);
 
 fun mk_absynLet(id, ab1, ab2) = 
   mk_app(mk_app(mk_ident "LET", mk_lam(mk_vident id, ab2)), ab1);
@@ -234,6 +249,12 @@ fun absynFromDec d = case d of
   | Dtabbrev (tl, name, t) => raise NotSupported "type abbrev"
   | Dexn (name, tl) => raise NotSupported "Exceptions";
 
+(* mostly for debugging *)
+fun absynFromTop t = 
+  case t of
+       Tmod (name, SOME _ , decs) => raise NotSupported "Module signatures"
+     | Tmod (name, NONE, decs) => map absynFromDec decs      
+     | Tdec d => [absynFromDec d];
 (* TODO: in separate module? *)
 
 (* definition of Define in TotalDefn *) 
@@ -266,14 +287,14 @@ end
 
 fun defineFromTop t = 
   case t of
-(* TODO: new theory "name", ignore spec(?), containing declarations decs *)
        Tmod (name, SOME _ , decs) => raise NotSupported "Module signatures"
      | Tmod (name, NONE, decs) => 
             (new_theory (String.implode name);
             (* TODO give names *)
-             map (absynDefine o absynFromDec) decs;
-             export_theory())
-     | Tdec d => (absynDefine(absynFromDec d); ());
+            let val thms = map (absynDefine o absynFromDec) decs in
+             export_theory();
+             thms end)
+     | Tdec d => [absynDefine(absynFromDec d)];
 
 end
 
