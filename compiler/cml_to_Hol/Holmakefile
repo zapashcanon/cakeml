@@ -1,2 +1,5 @@
 INCLUDES = ../../semantics/
 
+cmlgen = testTheory.sml
+
+$(cmlgen): exampleProg.cml

@@ -31,4 +31,3 @@ fun testProg() = read_file "exampleProg.cml";
 
 (* read the cml file and produce HOL definitions *)
 val mydef = progDefine (testProg());
-

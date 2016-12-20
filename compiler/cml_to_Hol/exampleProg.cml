@@ -1,4 +1,6 @@
-val x  = let val y = 3 in 4 end;
+structure test =
+struct
+val (x : int) = let val y = 3 in 4 end;
 
 val main = let fun f x = 0 in f #"c" end; 
 
@@ -17,4 +19,5 @@ fun main7 x = ((x : bool) :: [] = [x] @ [x]) orelse false;
 
 (* fun fib n = if n = 0 orelse n = 1 then n else fib (n-1) + fib (n-2);
     non-trivial termination proof *)
+end
 
