@@ -1,6 +1,7 @@
 open preamble modLangTheory;
 
 open modSemTheory modPropsTheory
+
 (* Liveness analysis for modLang globals, temporarily in proofs/ for convenience *)
 
 val _ = new_theory "mod_live";
@@ -100,11 +101,16 @@ val glob_exp_def = tDefine "pure_exp"`
 
 *)
 
+(* The number of positions that a dec defines*)
+val pos_dec_def = Define`
+  (pos_dec (modLang$Dlet n _) = n) ∧
+  (pos_dec (Dletrec funs) = LENGTH funs) ∧
+  (pos_dec _ = 0)`
+
+
 val pos_notin_def = Define`
-  (pos_notin pos 0 g = T) ∧
-  (pos_notin pos (SUC n) g =
-    (lookup pos g = NONE ∧
-    pos_notin pos n g))`
+  (pos_notin pos n g ⇔
+  EVERY (λp. lookup p g = NONE) (GENLIST (λm. pos + m) n))`
 
 (* Returns a modified dec + updates the globals it read *)
 val live_dec_def = Define`
@@ -124,12 +130,6 @@ val live_dec_def = Define`
       let g' = list_union (MAP (λ(f,x,e). glob_exp e) funs) in
       (Dletrec funs,union g' g)) ∧
   (live_dec dec pos g = (dec,g))`
-
-(* The number of positions that a dec defines*)
-val pos_dec_def = Define`
-  (pos_dec (modLang$Dlet n _) = n) ∧
-  (pos_dec (Dletrec funs) = LENGTH funs) ∧
-  (pos_dec _ = 0)`
 
 val live_decs_def = Define`
   (live_decs [] pos g = ([],g)) ∧
@@ -223,6 +223,7 @@ val pure_exp_evaluate = Q.prove(`
     (Cases_on`pes`>>fs[pure_exp_def]>>
     cheat));
 
+(* States match up exactly except on the missing globals *)
 val state_rel_def = Define`
   state_rel (g:num_set) s t ⇔
   s.clock = t.clock ∧
@@ -264,14 +265,21 @@ val v_glob_exp_def = tDefine "v_glob_exp" `
     Induct>>rw[]>>res_tac>>fs[v_size_def]))
 
 (* global containment *)
-val glob_contained_def = Define`
-  glob_contained env (s:'a modSem$state) g ⇔
-    EVERY (λ(n,v). subspt (v_glob_exp v) g) env.v ∧
+val st_glob_contained_def = Define`
+  st_glob_contained (s:'a modSem$state) g ⇔
     EVERY (λref. case ref of
       Refv v => subspt (v_glob_exp v) g
     | Varray vs => EVERY (λv. subspt (v_glob_exp v) g) vs
     | W8array _ => T) s.refs ∧
-    EVERY (λv. case v of NONE => T | SOME v => subspt (v_glob_exp v) g) s.globals`
+    (* global containment but only for the positions that occur in g *)
+    ∀n. n < LENGTH s.globals ∧ n ∈ domain g ⇒
+    case EL n s.globals of
+      NONE => T
+    | SOME v => subspt (v_glob_exp v) g`
+
+val env_glob_contained_def = Define`
+  env_glob_contained env g ⇔
+  EVERY (λ(n,v). subspt (v_glob_exp v) g) env.v`
 
 (* TODO: move to HOL? *)
 val subspt_union = prove(``
@@ -297,17 +305,21 @@ val res_glob_contained_def = Define`
 val glob_contained_evaluate = Q.prove(`
   (∀env (s:'a modSem$state) es s' res g.
   evaluate env s es = (s',res) ∧
-  glob_contained env s g ∧
+  st_glob_contained s g ∧
+  env_glob_contained env g ∧
   EVERY (λe. subspt (glob_exp e) g) es ⇒
-  hide(glob_contained env s' g ∧
+  hide(
+  st_glob_contained s' g ∧
   res_glob_contained res g)) ∧
   (∀env (s:'a modSem$state) v pes err s' res g.
   evaluate_match env s v pes err = (s',res) ∧
-  glob_contained env s g ∧
+  st_glob_contained s g ∧
+  env_glob_contained env g ∧
   subspt (v_glob_exp v) g ∧
   subspt (v_glob_exp err) g ∧
   EVERY (λ(p,e). subspt (glob_exp e) g) pes ⇒
-  hide(glob_contained env s' g ∧
+  hide(
+  st_glob_contained s' g ∧
   res_glob_contained res g))`,
   ho_match_mp_tac evaluate_ind>>
   fs[evaluate_def,glob_exp_def,v_glob_exp_def]>>
@@ -343,17 +355,18 @@ val glob_contained_evaluate = Q.prove(`
     fs[v_glob_exp_def,subspt_list_union,EVERY_REVERSE,EVERY_MAP])
   >-
     (rw[]>>EVERY_CASE_TAC>>
-    fs[hide_def,res_glob_contained_def,glob_contained_def]>>
+    fs[hide_def,res_glob_contained_def,env_glob_contained_def]>>
     imp_res_tac ALOOKUP_MEM>>
     fs[EVERY_MEM,FORALL_PROD]>>
     metis_tac[])
   >-
     (rw[]>>
-    fs[hide_def,res_glob_contained_def,glob_contained_def,EVERY_EL,IS_SOME_EXISTS]>>
-    first_x_assum(qspec_then`n` assume_tac)>>rfs[])
+    fs[hide_def,res_glob_contained_def,st_glob_contained_def,EVERY_EL,IS_SOME_EXISTS]>>
+    first_x_assum(qspec_then`n` assume_tac)>>rfs[]>>
+    fs[subspt_def])
   >-
     (rw[]>>
-    fs[subspt_union,subspt_list_union,EVERY_MAP,glob_contained_def,
+    fs[subspt_union,subspt_list_union,EVERY_MAP,env_glob_contained_def,
        res_glob_contained_def,hide_def,LAMBDA_PROD,v_glob_exp_def])
   >-
     (* app case... *)
@@ -367,7 +380,7 @@ val glob_contained_evaluate = Q.prove(`
     (rw[]>>EVERY_CASE_TAC>>fs[hide_def]>>rveq>>
     first_assum match_mp_tac>>fs[subspt_union]>>
     imp_res_tac evaluate_length>>Cases_on`a`>>fs[]>>
-    fs[subspt_union,subspt_list_union,EVERY_MAP,glob_contained_def,
+    fs[subspt_union,subspt_list_union,EVERY_MAP,
        res_glob_contained_def,hide_def,LAMBDA_PROD,v_glob_exp_def])
   >-
     (rw[]>>EVERY_CASE_TAC>>fs[hide_def]
@@ -375,11 +388,11 @@ val glob_contained_evaluate = Q.prove(`
       (first_x_assum drule>>fs[subspt_union]>>strip_tac>>
       first_x_assum(qspec_then `g` mp_tac)>>impl_tac
       >-
-        (fs[glob_contained_def,libTheory.opt_bind_def]>>
-        Cases_on`n`>>fs[]>>
-        imp_res_tac evaluate_length>>Cases_on`a`>>fs[res_glob_contained_def])
+        (fs[env_glob_contained_def,libTheory.opt_bind_def]>>Cases_on`n`>>fs[]>>
+        imp_res_tac evaluate_length>>Cases_on`a`>>
+        fs[res_glob_contained_def])
       >>
-      fs[glob_contained_def,res_glob_contained_def,subspt_union])
+      fs[res_glob_contained_def,subspt_union])
     >>
     first_assum match_mp_tac>>fs[subspt_union])
   >-
@@ -391,19 +404,17 @@ val glob_contained_evaluate = Q.prove(`
     first_x_assum drule>>fs[]>>
     disch_then(qspec_then`g` mp_tac)>> impl_tac
     >-
-      (fs[glob_contained_def]>>
+      (fs[env_glob_contained_def]>>
       cheat)
     >>
-    fs[hide_def,res_glob_contained_def,glob_contained_def]>>
-    imp_res_tac ALOOKUP_MEM>>
-    fs[EVERY_MEM,FORALL_PROD]>>
-    metis_tac[]) |> SIMP_RULE std_ss [hide_def];
+    fs[]) |> SIMP_RULE std_ss [hide_def];
 
 val glob_contained_evaluate_sing = Q.prove(`
   evaluate env s [e] = (s',res) ∧
-  glob_contained env s g ∧
+  st_glob_contained s g ∧
+  env_glob_contained env g ∧
   subspt (glob_exp e) g  ⇒
-  glob_contained env s' g ∧
+  st_glob_contained s' g ∧
   res_glob_contained res g`,
   rw[]>>
   drule (CONJUNCT1 glob_contained_evaluate)>>
@@ -418,7 +429,8 @@ val state_rel_evaluate = Q.prove(`
   (∀env (s:'a modSem$state) es s' res g  t.
   evaluate env s es = (s',res) ∧
   state_rel g s t ∧
-  glob_contained env s g ∧
+  st_glob_contained s g ∧
+  env_glob_contained env g ∧
   EVERY (λe. subspt (glob_exp e) g) es ∧
   (* g can be any over-approximation of the read-able globals *)
   res ≠ Rerr (Rabort Rtype_error) ⇒
@@ -428,7 +440,8 @@ val state_rel_evaluate = Q.prove(`
   (∀env (s:'a modSem$state) v pes err s' res g t.
   evaluate_match env s v pes err = (s',res) ∧
   state_rel g s t ∧
-  glob_contained env s g ∧
+  st_glob_contained s g ∧
+  env_glob_contained env g ∧
   subspt (v_glob_exp v) g ∧
   subspt (v_glob_exp err) g ∧
   EVERY (λ(p,e). subspt (glob_exp e) g) pes ∧
@@ -549,8 +562,10 @@ val state_rel_evaluate = Q.prove(`
             strip_tac>>
             fs[do_opapp_def]>>qpat_x_assum`_=SOME(q',r)` mp_tac>>
             EVERY_CASE_TAC>>fs[]>>strip_tac>>rveq>>
-            Cases_on`a`>>fs[res_glob_contained_def,v_glob_exp_def,subspt_union]>>
-            fs[glob_contained_def,subspt_list_union,EVERY_MAP,LAMBDA_PROD]>>
+            Cases_on`a`>>
+            fs[res_glob_contained_def,v_glob_exp_def,subspt_union]>>
+            fs[st_glob_contained_def,env_glob_contained_def,
+              subspt_list_union,EVERY_MAP,LAMBDA_PROD]>>
             rfs[]>>
             (* Needs a simple induction on build_rec_env *)
             cheat)>>
@@ -615,7 +630,7 @@ val state_rel_evaluate = Q.prove(`
     first_x_assum drule>> impl_tac>> fs[]>>rw[]>>fs[subspt_union]>>
     first_assum match_mp_tac>>fs[]>>
     lrule glob_contained_evaluate_sing>> disch_then(qspec_then`g` assume_tac)>>rfs[]>>
-    fs[glob_contained_def,libTheory.opt_bind_def]>>
+    fs[env_glob_contained_def,libTheory.opt_bind_def]>>
     Cases_on`n`>>fs[]>>
     imp_res_tac evaluate_length>>Cases_on`a`>>fs[res_glob_contained_def])
   >-
@@ -660,13 +675,21 @@ val evaluate_replicate = Q.prove(`
   FULL_SIMP_TAC std_ss [GSYM SNOC_APPEND,GSYM multiwordTheory.REPLICATE_SNOC]>>
   fs[GSYM REPLICATE]);
 
+val pos_notin_sem = Q.prove(`
+  ∀pos l g.
+  pos_notin pos l g ⇔
+  ∀n. n < l ⇒
+    pos + n ∉ domain g`,
+  fs[pos_notin_def,EVERY_GENLIST,lookup_NONE_domain]);
+
+(*
 val state_rel_evaluate_dec = Q.prove(`
   ∀d pos g d' g' env s s' res t.
   live_dec d pos g = (d',g') ∧
   LENGTH s.globals = pos ∧
   evaluate_dec env s d = (s',res:(env_ctor # modSem$v list, modSem$v) semanticPrimitives$result) ∧
   state_rel g' s t ∧
-  glob_contained env s g' ∧
+  st_glob_contained s g ∧
   res ≠ Rerr (Rabort Rtype_error)
   ⇒
   ∃t' res'.
@@ -675,15 +698,19 @@ val state_rel_evaluate_dec = Q.prove(`
     Rval (env,vs) =>
       ∃env' vs'. res' = Rval(env',vs') ∧
       env = env' ∧ LENGTH vs = LENGTH vs' ∧
-      (pos_notin (LENGTH s.globals) (pos_dec d) g ∨
-      (vs = vs' ∧ res_glob_contained (Rval vs) g'))
+      (pos_notin (LENGTH s.globals) (pos_dec d) g ∨ vs = vs') ∧
+      (* every new global that may be mentioned is in the subset *)
+      (∀n. n < LENGTH vs ∧ n + pos ∈ domain g' ⇒
+        subspt (v_glob_exp (EL n vs)) g')
   | Rerr e => res_glob_contained (Rerr e) g' ∧ res = res') ∧
-  state_rel g s' t'`,
+  state_rel g s' t' ∧
+  st_glob_contained s' g'`,
   Cases_on`d`>>fs[live_dec_def]
   >-
     (*Dlet *)
     (rw[evaluate_dec_def]
     >-
+      (* pure removal *)
       (qpat_x_assum`_=(s',res)` mp_tac>>
       TOP_CASE_TAC>>fs[]>>
       TOP_CASE_TAC>>fs[]
@@ -692,7 +719,8 @@ val state_rel_evaluate_dec = Q.prove(`
         strip_tac>>
         fs[evaluate_dec_def,evaluate_replicate,LENGTH_REPLICATE,pos_dec_def]>>
         drule (CONJUNCT1 pure_exp_evaluate)>>fs[hide_def]>>
-        rw[]>>fs[])
+        rw[]>>fs[pos_notin_sem]>>
+        metis_tac[])
       >>
       imp_res_tac pure_exp_evaluate>>rfs[hide_def]>>
       EVERY_CASE_TAC>>fs[])
@@ -707,73 +735,148 @@ val state_rel_evaluate_dec = Q.prove(`
       strip_tac>>
       drule (CONJUNCT1 state_rel_evaluate)>>
       disch_then drule>>fs[]>>impl_tac>-
-        fs[subspt_domain,domain_union,glob_contained_def]>>
+        fs[subspt_domain,domain_union,env_glob_contained_def]>>
       rw[]>>simp[]>>
       fs[state_rel_def,domain_union]>>
       lrule glob_contained_evaluate_sing>>
       disch_then(qspecl_then[`union (glob_exp e) g`] mp_tac)>>impl_tac>-
         (fs[subspt_domain,domain_union]>>
-        fs[glob_contained_def])>>
-      strip_tac>>
-      DISJ2_TAC>>
-      fs[res_glob_contained_def,v_glob_exp_def,subspt_list_union,EVERY_MAP])
+        fs[st_glob_contained_def,env_glob_contained_def])>>
+      strip_tac>> fs[]>>
+      fs[res_glob_contained_def,v_glob_exp_def,subspt_list_union,EVERY_MAP]>>
+      rw[]>>
+      fs[EVERY_EL])
     >>
       strip_tac>>
       drule (CONJUNCT1 state_rel_evaluate)>>
       disch_then drule>>fs[]>>impl_tac>-
-        (fs[subspt_domain,domain_union,glob_contained_def]>>
+        (fs[subspt_domain,domain_union,env_glob_contained_def]>>
         Cases_on`e'`>>rw[])>>
       rw[]>>simp[]>>
       fs[state_rel_def,domain_union,res_glob_contained_def]>>
       Cases_on`e'`>>fs[]>>
-      lrule glob_contained_evaluate_sing>>
+      (lrule glob_contained_evaluate_sing>>
       disch_then(qspecl_then[`union (glob_exp e) g`] mp_tac)>>impl_tac>-
         (fs[subspt_domain,domain_union]>>
-        fs[glob_contained_def])>>
+        fs[env_glob_contained_def])>>
       strip_tac>>
-      fs[res_glob_contained_def,v_glob_exp_def,subspt_list_union,EVERY_MAP])
+      fs[res_glob_contained_def,v_glob_exp_def,subspt_list_union,EVERY_MAP]))
   >-
     (rw[evaluate_dec_def]>>
     fs[evaluate_dec_def,evaluate_replicate,LENGTH_REPLICATE,pos_dec_def]>>
-    fs[state_rel_def,domain_union]>>
-    fs[res_glob_contained_def,EVERY_MAP,EVERY_MEM]>>
-    rw[]>>
-    PairCases_on`x`>>fs[v_glob_exp_def]>>
-    fs[subspt_union,subspt_list_union,subspt_domain,domain_union,SUBSET_DEF,domain_list_union,MEM_MAP,PULL_EXISTS,EXISTS_PROD]>>
-    metis_tac[])
+    fs[state_rel_def,domain_union,EL_MAP]
+    >-
+      fs[res_glob_contained_def,EVERY_MAP,LAMBDA_PROD,v_glob_exp_def,subspt_union,list_union_def]>>
+
+      (rw[]>>
+      fs[pos_notin_sem]>>rfs[])
+    >>
+      reverse( rw[])
+      >-
+        fs[st_glob_contained_def]>>
+
+      TRY(pairarg_tac)>>fs[v_glob_exp_def]>>
+      fs[subspt_union,subspt_list_union,subspt_domain,domain_union,SUBSET_DEF,domain_list_union,MEM_MAP,PULL_EXISTS,EXISTS_PROD,MEM_EL]>>rw[]>>
+      metis_tac[])
   >>
     (rw[evaluate_dec_def,pos_dec_def]>>
-    fs[state_rel_def]>>rfs[res_glob_contained_def]));
+    fs[state_rel_def]>>rfs[res_glob_contained_def,st_glob_contained_def]));
 
-(* Needs a better characterization of the globals that can appear in the first,
-   third, and last envs
+val live_dec_submap = Q.prove(`
+  ∀d pos g d' g'.
+  live_dec d pos g = (d',g') ⇒ subspt g g'`,
+  Cases>>fs[live_dec_def]>>rw[]>>
+  res_tac>>
+  fs[subspt_domain,domain_union,SUBSET_DEF]);
+
+val live_decs_submap = Q.prove(`
+  ∀ds pos g ds' g'.
+  live_decs ds pos g = (ds',g') ⇒ subspt g g'`,
+  Induct>>FULL_SIMP_TAC std_ss [live_decs_def]>- rw[]>>
+  Cases>>
+  LET_ELIM_TAC>>fs[live_dec_def]>>every_case_tac>>rw[]>>
+  res_tac>>
+  fs[subspt_domain,domain_union,SUBSET_DEF]);
+
+(*
+val st_glob_contained_trans = Q.prove(`
+  st_glob_contained s g ∧
+  subspt g g' ⇒
+  st_glob_contained s g'`,
+  fs[st_glob_contained_def,EVERY_MEM]>>rw[]>>EVERY_CASE_TAC>>fs[]>>rw[]>>
+  res_tac>>fs[]>>
+  metis_tac[subspt_trans])
+*)
+
 val state_rel_evaluate_decs = Q.prove(`
-  ∀ds pos g ds' g' env s s' env' res err t.
-  evaluate_decs env s ds = (s',env',res,err) ∧
+  ∀ds pos g ds' g' env s s' tds res err t.
+  evaluate_decs env s ds = (s',tds,res,err) ∧
   live_decs ds pos g = (ds',g') ∧
   LENGTH s.globals = pos ∧
   state_rel g' s t ∧
-  glob_contained env s g' ∧
+  st_glob_contained s g ∧
   err ≠ SOME (Rabort Rtype_error)
   ⇒
   ∃t' res'.
-  evaluate_decs env t ds' = (t',env',res',err) ∧
-  (∀n.
-    pos + n ∈ domain g ⇒ EL n res = EL n res') ∧
+  evaluate_decs env t ds' = (t',tds,res',err) ∧
   state_rel g s' t' ∧
-  glob_contained env' s' g'`,
+  st_glob_contained s' g' ∧ (* could have been proved separately *)
+  case err of
+    SOME e =>
+      (* for an error, res = res' = [] and the error has bounded globals *)
+      res_glob_contained (Rerr e) g'
+  | NONE =>
+    (* the elements of the results match on the ones that should *)
+    (∀n. n < LENGTH res ∧ pos + n ∈ domain g ⇒ EL n res = EL n res')`,
   Induct>>fs[evaluate_decs_def,live_decs_def]>>rw[]>>
   ntac 2 (pairarg_tac>>fs[])>>
   rw[]>>
-  qpat_x_assum`A=(s',env',res,err)` mp_tac>>
+  qpat_x_assum`A=(s',tds,res,err)` mp_tac>>
   ntac 2 (TOP_CASE_TAC>>fs[])
   >-
     drule state_rel_evaluate_dec>>
-    disch_then(qspecl_then [`env`,`s`,`q`,`Rval a`,`t`] mp_tac)>>fs[]>>strip_tac>>
+    disch_then(qspecl_then [`env`,`s`,`q`,`Rval a`,`t`] mp_tac)>>
+    fs[]>>
+    impl_tac>-
+      drule st_glob_contained_trans>>
+      metis_tac[live_dec_submap,st_glob_contained_trans]
+      ,live_decs_def]>>
+    fs[]>>strip_tac>>
     lrule evaluate_dec_globals>> strip_tac>>
     fs[evaluate_decs_def]>>
-    Cases_on`a`>>fs[]
+    Cases_on`a`>>fs[]>>
+    `LENGTH r = pos_dec h` by cheat>>
     >-
+      ntac 3 (TOP_CASE_TAC>>fs[])>>rw[]>>
+      first_x_assum drule>>
+      fs[]>> disch_then drule>>fs[]>>
+      disch_then(qspec_then `t' with globals updated_by (\g. g++MAP SOME vs')` mp_tac)>>
+      impl_tac>-
+        rw[]
+        >-
+          (fs[state_rel_def]>>rw[]>>
+          Cases_on`n < LENGTH t.globals`>>fs[]>>rfs[EL_APPEND1]>>
+          fs[pos_notin_sem]>>
+          `∃k. n = LENGTH t.globals + k ∧ k < LENGTH vs'` by
+            cheat>>
+          res_tac>>fs[])
+        >>
+          `st_glob_contained q g''` by
+            metis_tac[
+          fs[st_glob_contained_def]>>rw[]
+          >-
+
+          CONJ_TAC>-
+          metis_tac[]
+          fs[]
+            DECIDE_TAC
+          cheat
+          fs[EL_APPEND2]>>
+        _glob_contained_def]
+
+      disch_then(qspec_then
+      drule state_rel_evaluate_dec>>
+      disch_then (qspec_then drule
       cheat
     >>
     ntac 3 (TOP_CASE_TAC>>fs[])>>
@@ -783,7 +886,6 @@ val state_rel_evaluate_decs = Q.prove(`
     qpat_abbrev_tac`t'' = t' with globals updated_by A`>>
     disch_then(qspecl_then [`g`,`ds''`,`g''`,`t''`] mp_tac)>>
     impl_tac>-
-      `LENGTH r = pos_dec h` by cheat>>
       fs[]>>
       state_rel_evaluate_dec
       simp[glob_contained_def]
@@ -805,7 +907,7 @@ val state_rel_evaluate_decs = Q.prove(`
   drule state_rel_evaluate_dec>>
   disch_then(qspecl_then [`env`,`s`,`q`,`Rerr e`,`t`] mp_tac)>>fs[]>>strip_tac>>
   fs[evaluate_decs_def]>>
-  (* g is a submap of g'' *)
+  (* Since evaluation errored, g is a submap of g'' *)
   cheat);
 
   rfs[]

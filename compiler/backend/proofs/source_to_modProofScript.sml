@@ -2446,4 +2446,221 @@ val compile_correct = Q.store_thm("compile_correct",
                evaluatePropsTheory.io_events_mono_def,
                LESS_EQ_CASES,FST]);
 
+(* These should be in mod_live, but are here temporarily for convenience
+  Eventually, mod_live should be part of source_to_mod to follow the convention
+  in later ILs
+val list_union_def = Define`
+  list_union xs = FOLDR (λg s. union g s) LN xs`
+
+(* globals referenced by an expression *)
+val glob_exp_def = tDefine "pure_exp"`
+  (glob_exp ((Var_global n):modLang$exp) = insert n () LN) ∧
+  (glob_exp (Raise e) = glob_exp e) ∧
+  (glob_exp (Handle e pes) =
+    let pglobs = list_union (MAP (λ(p,e). glob_exp e) pes) in
+    union pglobs (glob_exp e)) ∧
+  (glob_exp (Lit _)  = LN) ∧
+  (glob_exp (Con _ es)  = list_union (MAP (λe. glob_exp e) es)) ∧
+  (glob_exp (Var_local _) = LN) ∧
+  (glob_exp (Fun n e) = glob_exp e) ∧
+  (glob_exp (App _ es) = list_union (MAP (λe. glob_exp e) es)) ∧
+  (glob_exp (If e1 e2 e3) =
+    union (glob_exp e1) (union(glob_exp e2) (glob_exp e3))) ∧
+  (glob_exp (Mat e pes) =
+    let pglobs = list_union (MAP (λ(p,e). glob_exp e) pes) in
+    union pglobs (glob_exp e)) ∧
+  (glob_exp (Let _ e1 e2) =
+    union (glob_exp e1) (glob_exp e2)) ∧
+  (glob_exp (Letrec funs e) =
+    let fglobs = list_union (MAP (λ(f,x,e). glob_exp e) funs) in
+    union fglobs (glob_exp e))`
+  (WF_REL_TAC `measure exp_size`>>
+  fs[]>>
+  rpt CONJ_TAC>>
+  strip_tac>> Induct>>rw[exp_size_def]>>res_tac>>fs[exp_size_def])
+
+val exp_bound_def = Define`
+  exp_bound e n ⇔ ∀m. m ∈ domain (glob_exp e) ⇒ m < n`
+
+(* modLang dec satisfies a global bound syntactically *)
+val dec_bound_def = Define`
+  (dec_bound ((Dlet _ e):modLang$dec) n ⇔ exp_bound e n) ∧
+  (dec_bound (Dletrec funs) n ⇔
+    EVERY (λ(f,x,e). exp_bound e n) funs) ∧
+  (dec_bound _ n ⇔ T)`
+
+(* The number of positions that a dec defines*)
+val pos_dec_def = Define`
+  (pos_dec (modLang$Dlet n _) = n) ∧
+  (pos_dec (Dletrec funs) = LENGTH funs) ∧
+  (pos_dec _ = 0)`
+
+val decs_bound_def = Define`
+  (decs_bound [] n ⇔ T) ∧
+  (decs_bound (d::ds) n ⇔
+    dec_bound d (n+pos_dec d) ∧
+    decs_bound ds (n+pos_dec d))`
+
+val pos_decs_def = Define`
+  (pos_decs [] = 0) ∧
+  (pos_decs (d::ds) = pos_dec d + pos_decs ds)`
+
+val env_bound_def = Define`
+  env_bound (env:(tvarN,tvarN,modLang$exp) namespace) n ⇔
+  ∀m. case nsLookup env m of
+    SOME (Var_global v) => v < n
+  | SOME (Var_local _) => T
+  | SOME _ => F
+  | NONE => T`
+
+val domain_list_union = prove(``
+  ∀ls.
+  ∀n. n ∈ domain (list_union ls) ⇔
+  ∃g. n ∈ domain g ∧ MEM g ls``,
+  Induct>>fs[list_union_def]>>fs[domain_union]>>
+  metis_tac[]);
+
+val env_bound_nsBind_local = Q.prove(`
+  env_bound env n ⇒
+  env_bound (nsBind a (Var_local b) env) n`,
+  fs[env_bound_def]>>rw[]>>
+  Cases_on`m`>>fs[nsLookup_nsBind]>>
+  Cases_on`a = n'` >>fs[nsLookup_nsBind]);
+
+val env_bound_nsBindList_local = Q.prove(`
+  ∀ls.env_bound env n ⇒
+  env_bound (nsBindList (MAP (λx. (x,Var_local x)) ls) env) n`,
+  fs[namespaceTheory.nsBindList_def]>>Induct>>fs[]>>rw[]>>
+  match_mp_tac env_bound_nsBind_local>>fs[]);
+
+val compile_exp_env_bound = Q.prove(`
+  (∀env e n.
+  env_bound env n ⇒
+  exp_bound (compile_exp env e) n) ∧
+  (∀env es n.
+  env_bound env n ⇒
+  EVERY (λe. exp_bound e n) (compile_exps env es)) ∧
+  (∀env pes n.
+  env_bound env n ⇒
+  EVERY (λ(p,e). exp_bound e n) (compile_pes env pes)) ∧
+  (∀env funs n.
+  env_bound env n ⇒
+  EVERY (λ(f,x,e). exp_bound e n) (compile_funs env funs))`,
+  ho_match_mp_tac compile_exp_ind>>
+  fs[compile_exp_def,exp_bound_def,glob_exp_def,domain_union,domain_list_union,EVERY_MEM]>>
+  rw[]>>fs[MEM_MAP,env_bound_nsBind_local,env_bound_nsBindList_local]>>
+  TRY
+    (rpt (first_x_assum drule)>>rw[]>>
+    res_tac>>pairarg_tac>>fs[])
+  >-
+    (every_case_tac>>fs[glob_exp_def,env_bound_def]>>
+    first_x_assum (qspec_then `x` assume_tac)>>every_case_tac>>fs[]>>rw[]>>
+    fs[glob_exp_def])
+  >-
+    (every_case_tac>>fs[glob_exp_def,domain_union,Bool_def,domain_list_union])
+  >-
+    (first_x_assum(qspec_then`n` mp_tac)>>impl_tac>-
+      (match_mp_tac env_bound_nsBindList_local>>fs[])>>
+    fs[FORALL_PROD]>>metis_tac[]));
+
+val env_bound_empty = Q.prove(`
+  env_bound nsEmpty n`,
+  fs[env_bound_def]);
+
+val env_bound_more = Q.prove(`
+  env_bound env n ∧ n ≤ m ⇒
+  env_bound env m`,
+  rw[env_bound_def]>>first_x_assum(qspec_then`m'`assume_tac)>>
+  every_case_tac>>fs[]);
+
+val env_bound_append = Q.prove(`
+  env_bound env n ∧
+  env_bound env' n ⇒
+  env_bound (nsAppend env env') n`,
+  rw[env_bound_def]>>
+  TOP_CASE_TAC>>fs[nsLookup_nsAppend_some]
+  >-
+    (last_x_assum(qspec_then`m` assume_tac)>>fs[]>>
+    cases_on`x`>>rfs[])
+  >>
+    (first_x_assum(qspec_then`m` assume_tac)>>fs[]>>
+    cases_on`x`>>rfs[]));
+
+fun lrule th =
+  last_assum(mp_tac o MATCH_MP (ONCE_REWRITE_RULE[GSYM AND_IMP_INTRO] th))
+
+val env_bound_alloc_defs = Q.prove(`
+  ∀ls next.
+  env_bound (alist_to_ns (alloc_defs next ls)) (next+LENGTH ls)`,
+  Induct>>fs[alloc_defs_def,env_bound_empty]>>fs[env_bound_def]>>rw[]>>
+  first_x_assum(qspecl_then[`next+1`,`m`] assume_tac)>>fs[]>>
+  Cases_on`m`>>fs[nsLookup_nsBind]
+  >-
+    (Cases_on`h=n`>>fs[nsLookup_nsBind]>>
+    every_case_tac>>fs[])
+  >>
+    every_case_tac>>fs[]);
+
+val compile_dec_env_bound = Q.prove(`
+  env_bound env next ∧
+  compile_dec next mn env d = (next',env',d') ⇒
+  (* Actually, it should be exactly the fresh globals but that doesn't matter *)
+  env_bound env' next' ∧
+  dec_bound d' next' ∧
+  next' = next + pos_dec d'`,
+  Cases_on`d`>>fs[compile_dec_def]
+  >-
+    (strip_tac>>rw[]>>fs[pos_dec_def]
+    >-
+      metis_tac[env_bound_alloc_defs,LENGTH_REVERSE]
+    >>
+    fs[dec_bound_def]>>
+    fs[exp_bound_def,glob_exp_def,domain_union,domain_list_union,MEM_MAP,PULL_EXISTS]>>
+    fs[GSYM exp_bound_def]>>
+    match_mp_tac (CONJUNCT1 compile_exp_env_bound)>>
+    drule (GEN_ALL env_bound_more)>>
+    fs[])
+  >-
+    (strip_tac>>
+    CONJ_ASM1_TAC>>rw[]>>fs[pos_dec_def,compile_funs_map]
+    >-
+      metis_tac[env_bound_alloc_defs,LENGTH_REVERSE,LENGTH_MAP]
+    >>
+    fs[dec_bound_def,GSYM compile_funs_map]>>
+    match_mp_tac (el 4(CONJUNCTS compile_exp_env_bound))>>
+    match_mp_tac env_bound_append>>
+    fs[]>>
+    lrule (GEN_ALL env_bound_more)>>
+    fs[])
+  >>
+    rw[]>>fs[env_bound_empty,dec_bound_def,pos_dec_def]);
+
+val compile_decs_env_bound = Q.prove(`
+  ∀ds env next next' env' ds' mn.
+  compile_decs next mn env ds = (next',env',ds') ∧
+  env_bound env next ⇒
+  env_bound env' (next+pos_decs ds') ∧
+  (* Note that decs_bound is actually more refined that the other bound notions
+     so far because it tracks the global positions for each dec
+  *)
+  decs_bound ds' next`,
+  Induct>>fs[compile_decs_def,pos_decs_def,decs_bound_def,env_bound_empty]>>
+  ntac 8 strip_tac >>
+  rpt (pairarg_tac>>fs[])>>rveq>>
+  drule(GEN_ALL compile_dec_env_bound)>>
+  disch_then drule>>
+  strip_tac>>
+  first_x_assum drule>> fs[] >> impl_tac>-
+    (match_mp_tac env_bound_append>>fs[]>>
+    lrule (GEN_ALL env_bound_more)>>
+    fs[])>>
+  rw[]
+  >-
+    (match_mp_tac env_bound_append>>fs[pos_decs_def]>>
+    irule env_bound_more>>
+    qexists_tac`next+pos_dec d'`>>fs[])
+  >>
+    fs[decs_bound_def]);
+
+*)
 val _ = export_theory ();
