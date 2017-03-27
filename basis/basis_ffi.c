@@ -63,7 +63,17 @@ void ffiopen (char *a) {
 }
 
 void ffifgetc (char *a) {
-  a[0] = fgetc(infds[a[0]]);
+  int c; /* not char, other EOF is mapped to a valid char */
+  if (infds[a[0]])
+    if ((c = fgetc(infds[a[0]])) == EOF)
+      a[1] = 1;
+    else {
+      a[0] = c;
+      a[1] = 0;
+    }
+  else
+    a[1] = 255;
+
 }
 
 void fficlose (char *a) {
@@ -75,15 +85,3 @@ void fficlose (char *a) {
     a[0] = 0;
 }
 
-void ffiisEof (char *a) {
-  int c; /* not char, other EOF is mapped to a valid char */
-  if (infds[a[0]])
-    if ((c = fgetc(infds[a[0]])) == EOF)
-      a[0] = 1;
-    else {
-      ungetc(c, infds[a[0]]);
-      a[0] = 0;
-    }
-  else
-    a[0] = 255;
-}
