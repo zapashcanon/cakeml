@@ -1,7 +1,8 @@
 open preamble miscTheory astTheory namespaceTheory typeSystemTheory;
 open namespacePropsTheory;
 open infer_tTheory unifyTheory;
-open stringTheory ;
+open stringTheory;
+open ml_monadBaseLib ml_monadBaseTheory;
 
 val _ = new_theory "infer";
 val _ = monadsyntax.temp_add_monadsyntax()
@@ -13,34 +14,16 @@ list_subset l1 l2 = EVERY (\x. MEM x l2) l1`;
 val list_set_eq = Define `
 list_set_eq l1 l2 ⇔ list_subset l1 l2 ∧ list_subset l2 l1`;
 
-(*  The inferencer uses a state monad internally to keep track of unifications at the expressions level *)
-
-(* 'a is the type of the state, 'b is the type of successful computations, and
- * 'c is the type of exceptions *)
-
-val _ = Datatype `
-  exc = Success 'a | Failure 'b`;
-
-val _ = type_abbrev("M", ``:'a -> ('b, 'c) exc # 'a``);
-
-val st_ex_bind_def = Define `
-(st_ex_bind : (α, β, γ) M -> (β -> (α, δ, γ) M) -> (α, δ, γ) M) x f =
-  λs.
-    dtcase x s of
-      (Success y,s) => f y s
-    | (Failure x,s) => (Failure x,s)`;
-
-val st_ex_return_def = Define `
-(st_ex_return (*: α -> (β, α, γ) M*)) x =
-  λs. (Success x, s)`;
-
 val _ = temp_overload_on ("monad_bind", ``st_ex_bind``);
 val _ = temp_overload_on ("monad_unitbind", ``\x y. st_ex_bind x (\z. y)``);
 val _ = temp_overload_on ("monad_ignore_bind", ``\x y. st_ex_bind x (\z. y)``);
 val _ = temp_overload_on ("return", ``st_ex_return``);
 
+val _ = Hol_datatype`
+  infer_exn = Exc of (locs option # mlstring)`
+
 val failwith_def = Define `
-(failwith : locs option -> α -> (β, γ, (locs option # α)) M) l msg = (\s. (Failure (l, msg), s))`;
+(failwith : locs option -> mlstring -> (β, γ, infer_exn) M) l msg = (\s. (Failure (Exc (l, msg)), s))`;
 
 val guard_def = Define `
 guard P l msg = if P then return () else failwith l msg`;
@@ -56,7 +39,7 @@ val write_def = Define `
 val lookup_st_ex_def = Define `
   lookup_st_ex l id ienv st =
     dtcase nsLookup ienv id of
-    | NONE => (Failure (l, concat [implode "Undefined variable: "; id_to_string id]), st)
+    | NONE => (Failure (Exc (l, concat [implode "Undefined variable: "; id_to_string id])), st)
     | SOME v => (Success v, st)`;
 
 val _ = Hol_datatype `
@@ -90,10 +73,10 @@ add_constraint (l : locs option) t1 t2 =
   \st.
     dtcase t_unify st.subst t1 t2 of
       | NONE =>
-          (Failure (l, concat [implode "Type mismatch between ";
+          (Failure (Exc (l, concat [implode "Type mismatch between ";
                                inf_type_to_string (t_walkstar st.subst t1);
                                implode " and ";
-                               inf_type_to_string (t_walkstar st.subst t2)]), st)
+                               inf_type_to_string (t_walkstar st.subst t2)])), st)
       | SOME s =>
           (Success (), st with <| subst := s |>)`;
 

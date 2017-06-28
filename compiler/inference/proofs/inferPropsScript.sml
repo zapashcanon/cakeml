@@ -1,6 +1,7 @@
 open preamble;
 open libTheory namespacePropsTheory typeSystemTheory astTheory semanticPrimitivesTheory terminationTheory inferTheory unifyTheory;
 open astPropsTheory typeSysPropsTheory;
+open ml_monadBaseTheory;
 
 val every_zip_split = Q.prove (
   `!l1 l2 P Q.

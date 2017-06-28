@@ -2,10 +2,76 @@ open preamble
      parserProgTheory inferTheory
      ml_translatorLib ml_translatorTheory
      semanticPrimitivesTheory inferPropsTheory
+     ml_monadBaseTheory ml_translatorTheory ml_translatorLib
+open ml_progLib
+open ml_monadStoreLib
+open ml_monad_translatorTheory ml_monad_translatorLib
+open set_sepTheory
 
 val _ = new_theory "inferProg"
 
 val _ = translation_extends "parserProg";
+
+val _ = temp_overload_on ("monad_bind", ``st_ex_bind``);
+val _ = temp_overload_on ("monad_unitbind", ``\x y. st_ex_bind x (\z. y)``);
+val _ = temp_overload_on ("monad_ignore_bind", ``\x y. st_ex_bind x (\z. y)``);
+val _ = temp_overload_on ("return", ``st_ex_return``);
+
+(******)
+val _ = (use_full_type_names := false);
+
+val _ = register_type ``:cpn``
+val _ = register_type ``:'a # 'b``;
+val _ = register_type ``:'a list``
+val _ = register_type ``:'a option``
+(******)
+
+
+(* TODO: move that to the storeLib file *)
+val EMP_STAR_GC = Q.prove(`emp * GC = GC`, fs[emp_def, STAR_def, SPLIT_def, ETA_THM]);
+val SAT_GC = Q.prove(`!h. GC h`,
+STRIP_TAC \\ fs[cfHeapsBaseTheory.GC_def, SEP_EXISTS] \\ qexists_tac `\x. T` \\ fs[]);
+
+fun create_empty_extension_store refs_type store_hprop_name = let
+    (* Store invariant *)
+    val store_var = mk_var(store_hprop_name, mk_type("fun", [refs_type, ``:hprop``]))
+    val store_X_hprop_def = Define `^store_var = \state. emp`
+    val store_hprop_const = concl store_X_hprop_def |> lhs
+
+    val refs_var = mk_var("refs", refs_type)
+    val current_state = get_state(get_ml_prog_state())
+
+    (* Validity theorem *)
+    val validity_solve_tac = 
+        STRIP_TAC
+	\\ SIMP_TAC bool_ss [REFS_PRED_def, store_X_hprop_def]
+        \\ SIMP_TAC bool_ss [EMP_STAR_GC, SAT_GC]
+    val validity_goal = ``!(^refs_var). REFS_PRED ^store_hprop_const refs ^current_state``
+
+    val thm_name = "INIT_" ^store_hprop_name
+    val valid_store_X_hprop_thm = store_thm(thm_name, validity_goal, validity_solve_tac)
+    val _ = print ("Saved theorem __ \"" ^thm_name ^"\"\n")
+
+    (* Existential theorem *)
+    val exists_solve_tac =
+	SIMP_TAC bool_ss [VALID_REFS_PRED_def]
+        \\ EXISTS_TAC (Term.inst [``:'a`` |-> ``:unit``] current_state)
+        \\ SIMP_TAC bool_ss [valid_store_X_hprop_thm]
+
+    val exists_goal = ``VALID_REFS_PRED ^store_hprop_const``
+
+    val thm_name = store_hprop_name ^"_EXISTS"
+    val exists_store_X_hprop_thm = store_thm(thm_name, exists_goal, exists_solve_tac)
+    val _ = print ("Saved theorem __ \"" ^thm_name ^"\"\n")
+in mk_store_translation_result [] [] store_X_hprop_def valid_store_X_hprop_thm exists_store_X_hprop_thm [] [] end;
+
+val refs_type = ``:(num |-> infer_t) infer_st``;
+val store_hprop_name = "INFER_STORE";
+val store_trans_res = create_empty_extension_store refs_type store_hprop_name;
+
+val _ = init_translation store_trans_res []  [];
+
+(****************************************)
 
 (* translator setup *)
 
@@ -239,14 +305,6 @@ val t_unify_side_def = Q.store_thm("t_unify_side_def",
   THEN FULL_SIMP_TAC std_ss [])
   |> update_precondition;
 
-val ts_unify_side_def = Q.store_thm("ts_unify_side_def",
-  `!s t v. ts_unify_side s t v <=> t_wfs s`,
-  STRIP_TAC THEN Cases_on `t_wfs s`
-  THEN FULL_SIMP_TAC std_ss [t_unify_side_lemma]
-  THEN ONCE_REWRITE_TAC [t_unify_side_rw]
-  THEN FULL_SIMP_TAC std_ss [])
-  |> update_precondition;
-
 val _ = save_thm("anub_ind",REWRITE_RULE[MEMBER_INTRO]miscTheory.anub_ind)
 val _ = translate (REWRITE_RULE[MEMBER_INTRO] miscTheory.anub_def)
 
@@ -255,12 +313,20 @@ val _ = (extra_preprocessing :=
    st_ex_return_def, failwith_def, guard_def, read_def, write_def]);
 
 val _ = translate (def_of_const ``id_to_string``)
+
+(* Monadic translation *)
 val _ = translate (def_of_const ``lookup_st_ex``)
 val _ = translate (def_of_const ``fresh_uvar``)
 val _ = translate (def_of_const ``n_fresh_uvar``)
+(* Monadic translation *)
+
 val _ = translate (def_of_const ``init_infer_state``)
+
+(* Monadic translation *)
 val _ = translate (def_of_const ``infer$init_state``)
 val _ = translate (def_of_const ``get_next_uvar``)
+(* Monadic translation *)
+
 val _ = translate (def_of_const ``infer_deBruijn_subst``)
 val _ = translate (def_of_const ``generalise``)
 val _ = translate (def_of_const ``infer_type_subst``)
@@ -435,8 +501,11 @@ fun full_infer_def aggressive const = let
 val infer_def = full_infer_def false;
 val aggr_infer_def = full_infer_def true;
 
+(* Monadic translation *)
 val _ = translate (infer_def ``apply_subst``);
 val _ = translate (infer_def ``apply_subst_list``);
+(* Monadic translation *)
+
 val _ = translate (infer_def ``tc_to_string``);
 
 val tc_to_string_side_thm = Q.store_thm ("tc_to_string_side_thm",
@@ -454,11 +523,15 @@ val inf_type_to_string_side_thm  = Q.store_thm ("inf_type_to_string_side_thm",
   rw [] >>
   rw [Once (theorem "inf_type_to_string_side_def")]) |> update_precondition;
 
+(* Monadic translation *)
 val _ = translate (infer_def ``add_constraint``);
+(* Monadic translation *)
 
 val add_constraint_side_def = definition"add_constraint_side_def"
 
+(* Monadic translation *)
 val _ = translate (infer_def ``add_constraints``);
+(* Monadic translation *)
 
 val add_constraint_side_thm = Q.store_thm("add_constraint_side_thm",
   `∀l x y z. t_wfs z.subst ⇒ add_constraint_side l x y z`,
@@ -475,10 +548,14 @@ val add_constraints_side_thm = Q.store_thm("add_constraints_side_thm",
   \\ every_case_tac \\ fs[] \\ rw[]
   \\ metis_tac[unifyTheory.t_unify_wfs]);
 
+(* Monadic translation *)
 val _ = translate (infer_def ``constrain_op``
                    |> CONV_RULE(STRIP_QUANT_CONV(RAND_CONV pmatch_app_distrib_conv)));
+(* Monadic translation *)
 
+(* Monadic translation *)
 val _ = translate (infer_def ``t_to_freevars``);
+(* Monadic translation *)
 
 val MAP_type_name_subst = prove(
   ``MAP (type_name_subst tenvT) ts =

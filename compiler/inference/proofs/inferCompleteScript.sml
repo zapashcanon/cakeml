@@ -8,6 +8,8 @@ open infer_eSoundTheory;
 open infer_eCompleteTheory;
 open type_eDetermTheory envRelTheory namespacePropsTheory;
 
+open ml_monadBaseTheory;
+
 val _ = new_theory "inferComplete";
 
 fun Abbrev_wrap eqth =
