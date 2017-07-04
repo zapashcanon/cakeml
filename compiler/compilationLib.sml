@@ -1436,6 +1436,37 @@ fun compile backend_config_def cbv_to_bytes heap_size stack_size name prog_def =
     val lab_prog_name = (!intermediate_prog_prefix) ^ "lab_prog"
     val stack_to_lab_thm = compile_to_lab data_prog_def to_data_thm lab_prog_name
     val lab_prog_def = definition(mk_abbrev_name lab_prog_name)
+    (*
+      val tm = rconc stack_to_lab_thm
+      val cs1 = compilation_compset()
+      val () = computeLib.extend_compset [
+        computeLib.Extenders [ add_arm6_encode_compset ],
+        computeLib.Defs [ arm6_backend_config_def, arm6_names_def, lab_prog_def ]
+      ] cs1
+      val eval = computeLib.CBV_CONV cs1
+      val th =
+      tm |> (REWR_CONV from_lab_def THENC
+             REWR_CONV lab_to_targetTheory.compile_def THENC
+             REWR_CONV lab_to_targetTheory.compile_lab_def  THENC
+             REWR_CONV LET_THM THENC BETA_CONV THENC
+             PATH_CONV"llr" eval)
+    val ctm = th |> rconc |> rand |> dest_abs |> #2 |> rand |> strip_abs |> #2 |> rator |> rator |> rand
+              |> rator |> rand |> rand
+    val code = th |> rconc |> find_term (listSyntax.is_list)
+    val code_list = code |> listSyntax.dest_list |> #1
+    fun sec_ok_eval item = eval ``sec_ok_light ^ctm ^item`` |> rconc
+    fun line_ok_eval item = eval ``line_ok_light ^ctm ^item`` |> rconc
+    val bad_code_list = List.filter (same_const boolSyntax.F o sec_ok_eval) code_list
+    val insts = bad_code_list |> map (#1 o listSyntax.dest_list o rand) |> List.concat
+    val bad_insts = List.filter (same_const boolSyntax.F o line_ok_eval) insts
+
+    val x = el 50 bad_insts
+    val th1 = ``line_ok_light ^ctm ^x``  |>
+        (REWR_CONV(last(CONJUNCTS lab_to_targetTheory.line_ok_light_def)) THENC
+         RATOR_CONV(RAND_CONV(eval)) THENC
+         REWRITE_CONV [asmTheory.asm_ok_def] THENC
+         RAND_CONV(REWR_CONV asmTheory.offset_ok_def THENC RAND_CONV eval))
+    *)
     val result = cbv_to_bytes stack_to_lab_thm lab_prog_def heap_size stack_size (name^".S")
     val bytes_name = (!intermediate_prog_prefix) ^ "bytes"
     val bytes_def = mk_abbrev bytes_name (result |> extract_bytes_ffis |> #1)
