@@ -211,9 +211,7 @@ val remove_labels_loop_def = Define `
         (* move label padding into instructions *)
         let sec_list = pad_code (c.encode (Inst Skip)) sec_list in
         (* it ought to be impossible for done to be false here *)
-          if done /\ all_enc_ok_light c sec_list
-          then SOME (sec_list,labs)
-          else NONE
+          if done then SOME (sec_list,labs) else NONE
       else
         (* repeat *)
         if clock = 0:num then NONE else
@@ -275,7 +273,10 @@ val compile_lab_def = Define `
   compile_lab c sec_list =
     let ffis = find_ffi_names sec_list in
       case remove_labels c.init_clock c.asm_conf ffis sec_list of
-      | SOME (sec_list,l1) => SOME (prog_to_bytes sec_list,ffis)
+      | SOME (sec_list,l1) =>
+        if all_enc_ok_light c.asm_conf sec_list then
+          SOME (prog_to_bytes sec_list,ffis)
+        else NONE
       | NONE => NONE`;
 
 (* compile labLang *)

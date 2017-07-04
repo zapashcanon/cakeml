@@ -4529,6 +4529,7 @@ val remove_labels_loop_thm = Q.prove(
     ALL_DISTINCT (MAP Section_num code) ∧
     EVERY (ALL_DISTINCT o extract_labels o Section_lines) code ∧
     all_enc_ok_pre c code ∧ (* new loop invariant *)
+    all_enc_ok_light c code2 ∧
     all_encd0 mc_conf.target.config.encode code ∧
     c = mc_conf.target.config ∧
     enc_ok mc_conf.target.config ∧
@@ -4721,6 +4722,7 @@ val remove_labels_thm = Q.store_thm("remove_labels_thm",
    ALL_DISTINCT (MAP Section_num code) /\
    EVERY (ALL_DISTINCT o extract_labels o Section_lines) code /\
    all_enc_ok_pre mc_conf.target.config code /\
+   all_enc_ok_light mc_conf.target.config code2 /\
    remove_labels clock mc_conf.target.config mc_conf.ffi_names code = SOME (code2,labs) ==>
    all_enc_ok mc_conf.target.config labs mc_conf.ffi_names 0 code2 /\
    code_similar code code2 /\ (pos_val 0 0 code2 = 0) /\
@@ -4852,6 +4854,7 @@ val IMP_state_rel_make_init = Q.prove(
    EVERY sec_labels_ok code /\
    ALL_DISTINCT (MAP Section_num code) /\
    EVERY (ALL_DISTINCT o extract_labels o Section_lines) code /\
+    all_enc_ok_light mc_conf.target.config code2 /\
     enc_ok mc_conf.target.config /\
     all_enc_ok_pre mc_conf.target.config code /\
     remove_labels clock mc_conf.target.config mc_conf.ffi_names code =
