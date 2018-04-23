@@ -2,14 +2,13 @@ open
   preamble
   ml_translatorLib
   ml_progLib
-  TextIOProgTheory
+  AppListProgTheory
   mlprettyprinterTheory
 
 val _ = (
   new_theory "PrettyPrinterProg";
-  translation_extends "TextIOProg";
+  translation_extends "AppListProg";
   generate_sigs := true;
-  register_type ``:'a app_list``;
   ml_prog_update (open_module "PrettyPrinter")
 )
 
