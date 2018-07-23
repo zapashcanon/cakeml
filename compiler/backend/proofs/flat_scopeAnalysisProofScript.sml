@@ -919,3 +919,5 @@ val compile_decs_correct = Q.store_thm("compile_decs_correct",
   >> fs [evaluate_decs_def])
 >- ( rw [evaluate_decs_def]
   >> cheat))
+
+val _ = export_theory ()
