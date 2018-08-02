@@ -858,7 +858,7 @@ val rename_decs_alpha_eq = Q.store_thm("rename_decs_alpha_eq",
 val alpha_eq_dec_ind = theorem "alpha_eq_dec_ind"
 
 (* TODO *)
-
+(*
 val (t_rel_rules, t_rel_ind, t_rel_cases) = Hol_reln
 
    (* TODO: on each case, do we need to check anything on t ? *)
@@ -871,13 +871,15 @@ val (t_rel_rules, t_rel_ind, t_rel_cases) = Hol_reln
    (∀ env env' t t' id id' es es'. (* TODO: do we care about id ? *) LIST_REL t_rel es es' ⇒ t_rel env env' (Con t id es) (Con t' id' es')) ∧
    (∀ env env' t t' x x'. OPTREL (t_rel env env') (ALOOKUP x env) (ALOOKUP x' env') ⇒ t_rel env env' (Var_local t x) (Var_local t' x')) ∧
    (∀ env env' t t' x x' e e'. t_rel ({env with v = (x,""::env.v) (x',"plop"::env') e e' ⇒ t_rel env env' (Fun t x e) (Fun t' x' e'))
+)
 *)
 
+(*
 val (v_rel_rules, v_rel_ind, v_rel_cases) = Hol_reln
 
   `(∀ lit lit'.
 
-      lit = lit' ⇒ v_rel (flatSem$Litv lit) (flatSem$ Litv lit')) ∧ (
+      lit = lit' ⇒ v_rel (flatSem$Litv lit) (flatSem$Litv lit')) ∧ (
 
     ∀ cn cn' vs vs'.
 
@@ -891,7 +893,7 @@ val (v_rel_rules, v_rel_ind, v_rel_cases) = Hol_reln
 
     ∀ env env' funs funs' x x'.
 
-      TODO ) ∧ (
+      v_rel funs funs' (* TODO *) ) ∧ (
 
     ∀ loc loc'.
 
@@ -900,6 +902,7 @@ val (v_rel_rules, v_rel_ind, v_rel_cases) = Hol_reln
     ∀ vs vs'.
 
       LIST_REL v_rel vs vs' ⇒ v_rel (Vectorv vs) (Vectorv vs'))`
+      *)
 
 val (sv_rel_rules, sv_rel_ind, sv_rel_cases) = Hol_reln
 
@@ -951,17 +954,49 @@ val alpha_eq_es_LENGTH = Q.store_thm("alpha_eq_es_LENGTH",
 >> Cases_on `l`
 >> rw[alpha_eq_exp_def])
 
+(** NEW NEW ONE **)
+val alpha_eq_env_def = Define
+
+  `alpha_eq_env env env' = T` (* TODO *)
+
+val blablabla = Q.store_thm("blablabla",
+
+  `(∀ es es' env env' res res' s s'.
+
+      alpha_eq_env env env' ∧
+      alpha_eq_es [] es es' ∧
+      s_rel s s' ∧
+      res = flatSem$evaluate env s es ∧
+      SND res ≠ Rerr (Rabort Rtype_error) ∧
+      res' = flatSem$evaluate env' s' es'
+
+      ⇒ r_rel res res') ∧
+
+   (∀ pes pes' env env' res res' s s' v v' err_v err_v'.
+
+      alpha_eq_env env env' ∧
+      alpha_eq_pes [] pes pes' ∧
+      s_rel s s' ∧
+      v_rel v v' ∧
+      err_v_rel err_v err_v' ∧
+      res = flatSem$evaluate_match env s v pes err_v ∧
+      SND res ≠ Rerr (Rabort Rtype_error) ∧
+      res' = flatSem$evaluate_match env' s' v' pes' err_v
+
+      ⇒ r_rel res res')'
+
+
 (** NEW ONE **)
 val djlksjflskj = Q.store_thm("fjklsjfkl",
 
-  `(∀ env (s : 'ffi flatSem$state) es es' res res'.
+  `(∀ env (s : 'ffi flatSem$state) es es' res res' .
         flatSem$evaluate env s es = res
       ∧ SND res ≠ Rerr (Rabort Rtype_error)
       ∧ alpha_eq_es [] es es'
       ∧ flatSem$evaluate env s es' = res'
       ⇒ res = res') ∧ (
 
-    ∀ env (s : 'ffi flatSem$state) v pes err_v pes' res res'.
+    ∀ env (s : 'ffi flatSem$state) v pes err_v pes' res res' .
         flatSem$evaluate_match env s v pes err_v = res
       ∧ SND res ≠ Rerr (Rabort Rtype_error)
       ∧ alpha_eq_pes [] pes pes'
@@ -1086,22 +1121,17 @@ cheat
 (* FUN et App, If funs match *)
 )
 
-      val r_rel_def = Define
-
-      `r_rel r r' =
-        (r = r') ∨ `
-
 (** OLD **)
 val djlksjflskj = Q.store_thm("fjklsjfkl",
 
-  `(∀ env (s : 'ffi flatSem$state) es es' resState resState' res res'.
+  `(∀ env (s : 'ffi flatSem$state) es es' resState resState' res res' .
         flatSem$evaluate env s es = (resState, res)
       ∧ res ≠ Rerr (Rabort Rtype_error)
       ∧ alpha_eq_es [] es es'
       ∧ flatSem$evaluate env s es' = (resState', res')
       ⇒ resState = resState' ∧ r_rel res res') ∧ (
 
-    ∀ env (s : 'ffi flatSem$state) v pes err_v pes' resState resState' res res'.
+    ∀ env (s : 'ffi flatSem$state) v pes err_v pes' resState resState' res res' .
         flatSem$evaluate_match env s v pes err_v = (resState, res)
       ∧ res ≠ Rerr (Rabort Rtype_error)
       ∧ alpha_eq_pes [] pes pes'
@@ -1303,91 +1333,5 @@ val djlksjflskj = Q.store_thm("fjklsjfkl",
 cheat
 (* FUN et App, If funs match *)
 )
-
-val djlksjflskj = Q.store_thm("fjklsjfkl",
-
-  `∀ env (s : 'a flatSem$state) dec dec' resState resState' res res'.
-      (resState, _, res) = flatSem$evaluate_dec env s dec
-    ∧ res ≠ SOME (Rabort Rtype_error)
-    ∧ alpha_eq_dec dec dec'
-    ∧ (resState', _, res') = flatSem$evaluate_dec env s dec'
-    ⇒ resState = resState' ∧ res = res' (* TODO *)`,
-
-
-  Cases_on `dec`
->- (
-  Cases_on `dec'`
-   >> rw[alpha_eq_dec_def]
-   >> (
-
-   )
-  )
-)
-
-val djlksjflskj = Q.store_thm("fjklsjfkl",
-
-  `∀ env (s : 'a flatSem$state) decs decs' resState resState' res res'.
-      (resState, _, res) = flatSem$evaluate_decs env s decs
-    ∧ res ≠ SOME (Rabort Rtype_error)
-    ∧ alpha_eq_decs decs decs'
-    ∧ (resState', _, res') = flatSem$evaluate_decs env s decs'
-    ⇒ resState = resState' ∧ res = res' (* TODO *)`,
-
-   Induct_on `decs`
->- ( rw[]
-  >> Cases_on `decs'`
-  >> fs[evaluate_decs_def, alpha_eq_decs_def])
->- ( Induct_on `s.clock`
-  >- ( rw[]
-    >> ( Cases_on `decs'`
-      >> fs[evaluate_decs_def, alpha_eq_decs_def]
-      >> EVERY_CASE_TAC
-      >> rw[]
-
-
-    )
-
-
-  >- ( rw[]
-    >> pair
-
-
-  >> EVERY_CASE_TAC
-    >-
-    >> res_tac
-  )
-  >- (
-
-  )
-
-
-
-
-  >- ( rw[evaluate_decs_def, alpha_eq_decs_def]
-    >> Cases_on `decs'`
-    >> fs[evaluate_decs_def, alpha_eq_decs_def])
-  >- (
-    rw[evaluate_decs_def, alpha_eq_decs_def]
-    >>
-  )
-  )
-
-
-val compile_decs_correct = Q.store_thm("compile_decs_correct",
-
-  `∀ env env' (s : 'a flatSem$state) s' decs decs' resState resState' res res'.
-      (resState, _, res) = flatSem$evaluate_decs env s decs
-    ∧ res ≠ SOME (Rabort Rtype_error)
-    ∧ env_rel env env'
-    ∧ s_rel s s'
-    ∧ decs' = flat_scopeAnalysis$compile_decs decs
-    ∧ (resState', _, res') = flatSem$evaluate_decs env' s' decs'
-    ⇒ s_rel resState resState' (* ∧ result_rel res res' *) (* TODO *)`,
-
-   Induct_on `decs`
->- ( rw [compile_decs_def]
-  >> fs [evaluate_decs_def])
->- ( rw [evaluate_decs_def]
-  >> cheat))
 
 val _ = export_theory ()
