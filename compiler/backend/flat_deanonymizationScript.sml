@@ -3,7 +3,7 @@ open
   flatLangTheory
   mlintTheory
 
-val _ = new_theory "unique_to_named";
+val _ = new_theory "flat_deanonymization";
 
 val compile_exp_def = tDefine "compile_exp" `
   (compile_exp counter e =

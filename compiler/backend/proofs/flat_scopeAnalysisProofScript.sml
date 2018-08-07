@@ -63,9 +63,6 @@ val alpha_eq_p_trans = Q.store_thm("alpha_eq_p_trans",
 >- (Cases_on `p''` >> fs[alpha_eq_p_def])
 >- (Cases_on `ps''` >> fs[alpha_eq_p_def]))
 
-(* TODO: dddddddddd *)
-(* fun progress tac = (fn g => let val (g',v) = tac g in if [g] = g' then failwith "foo" else (g', v) end)*)
-
 val extract_repl_p_def = tDefine "extract_repl_p" `
 
   (extract_repl_p (Pvar x) (Pvar x') = [(x, x')]) ∧
@@ -79,32 +76,6 @@ val extract_repl_p_def = tDefine "extract_repl_p" `
     | INL (p, _) => pat_size p
     | INR (ps, _) => pat1_size ps
   )`)
-
-(* TODO: useless :) *)
-val extract_repl_exp_def = tDefine "extract_repl_exp"
-  `(extract_repl_exp (Raise _ e) (Raise _ e') = extract_repl_exp e e') ∧
-   (extract_repl_exp (Handle _ e pes) (Handle _ e' pes') = (extract_repl_exp e e') ++ (extract_repl_pes pes pes')) ∧
-   (extract_repl_exp (Lit _ _) (Lit _ _) = []) ∧
-   (extract_repl_exp (Con _ _ es) (Con _ _ es') = extract_repl_es es es') ∧
-   (extract_repl_exp (Var_local _ _) (Var_local _ _) = []) ∧
-   (extract_repl_exp (Fun _ x e) (Fun _ x' e') = (x, x')::(extract_repl_exp e e')) ∧
-   (extract_repl_exp (App _ _ es) (App _ _ es') = extract_repl_es es es') ∧
-   (extract_repl_exp (If _ e1 e2 e3) (If _ e1' e2' e3') =
-      (extract_repl_exp e1 e1') ++ (extract_repl_exp e2 e2') ++ (extract_repl_exp e3 e3')) ∧
-   (extract_repl_exp (Mat _ e pes) (Mat _ e' pes') = (extract_repl_exp e e') ++ (extract_repl_pes pes pes')) ∧
-   (extract_repl_exp (Let _ x e1 e2) (Let _ x' e1' e2') =
-      (case x, x' of | SOME x, SOME x' => [(x, x')] | _, _ => []) ++
-      (extract_repl_exp e1 e1') ++ (extract_repl_exp e2 e2')) ∧
-   (extract_repl_exp (Letrec _ funs e) (Letrec _ funs' e') =
-      (extract_repl_funs funs funs') ++ (extract_repl_exp e e')) ∧
-   (extract_repl_funs ((fName, vName, e)::t) ((fName', vName', e')::t') =
-      (fName, fName')::(vName, vName')::(extract_repl_exp e e') ++ (extract_repl_funs t t')) ∧
-   (extract_repl_funs _ _ = []) ∧
-   (extract_repl_es (h::t) (h'::t') = (extract_repl_exp h h') ++ (extract_repl_es t t')) ∧
-   (extract_repl_es _ _ = []) ∧
-   (extract_repl_pe (p, e) (p', e') = (extract_repl_p p p') ++ (extract_repl_exp e e')) ∧
-   (extract_repl_pes (h::t) (h'::t') = (extract_repl_pe h h') ++ (extract_repl_pes t t')) ∧
-   (extract_repl_pes _ _ = [])`
 
 val alpha_eq_exp_def = tDefine "alpha_eq_exp" `
   (alpha_eq_pe repl p e p' e' = (alpha_eq_p p p' ∧ alpha_eq_exp ((extract_repl_p p p') ++ repl) e e')) ∧
@@ -288,89 +259,6 @@ val repl_valid_sym_sym = Q.store_thm("repl_valid_sym_sym",
 
    fs[repl_valid_sym_def, map_swap_swap_id, SWAP_def])
 
-(* TODO
-val extract_repl_p_repl_valid_sym = Q.store_thm("extract_repl_p_repl_valid_sym",
-
-  `(∀ p p'. repl_valid_sym (extract_repl_p p p') ⇒ repl_valid_sym (extract_repl_p p' p)) ∧
-   (∀ ps ps'. repl_valid_sym (extract_repl_ps ps ps') ⇒ repl_valid_sym (extract_repl_ps ps' ps))`,
-
-   ho_match_mp_tac alpha_eq_p_ind
->> rw[extract_repl_p_def, SWAP_def]
->- rw[repl_valid_sym_def,SWAP_def]
->> fs[ALOOKUP_MAP_SWAP, ALOOKUP_MAP_SWAP2]
-
->> rw[Once extract_valid_sym]
->> rw[map_swap_swap_id]
-
->> rw[repl_valid_sym_sym]
-
->- qmatch_rename_tac `repl_valid_sym (l1 ++ l2)`)
-
-val alpha_eq_repl_valid_sym = Q.store_thm("alpha_eq_repl_valid_sym"
- `(∀ p p'. alpha_eq_p p p' ⇒ repl_valid_sym (extract_repl_p p p')) ∧
-  (∀ ps ps'. alpha_eq_ps ps ps' ⇒ repl_valid_sym (extract_repl_ps ps ps'))`,
-
-  ho_match_mp_tac alpha_eq_p_ind >>
-  rw[repl_valid_sym_def, extract_repl_p_def, alpha_eq_p_def, SWAP_def] >>
-  fs[ALOOKUP_APPEND] >>
-
-  CASE_TAC >> fs[] >>
-    >-(FULL_CASE_TAC
-       >- fs[ALOOKUP_MAP_SWAP]
-       >- (fs[] >> imp_res_tac ALOOKUP_MAP_SWAP))
-    >-(FULL_CASE_TAC
-       >- fs[ALOOKUP_MAP_SWAP]
-       >- (fs[] >> imp_res_tac ALOOKUP_MAP_SWAP)
-       )
-
-
-
-
-  EVERY_CASE_TAC >> res_tac >> rw[] >> fs[] >>
-
-
-     fs[ALOOKUP_MAP_SWAP2]
-     rw[]
-  )
-  >-
-  fs[ALOOKUP_]
-
-  res_tac
-  res_tac >>
-  [MAP_APPEND,]
-  Cases_on`p'` >>
-  fs[extract_repl_p_def,SWAP_def]
-  ALOOKUP_MAP_SWAP
-  find"alpha_eq_p"
-  >-
-  >-
-  >-
-  >-
-  MAP_SWAP_extract_repl_p,] >>
-
-val alpha_eq_exp_sym = Q.store_thm("alpha_eq_exp_sym",
-
-  `(∀ l p e p' e'. (repl_valid_sym l ∧ alpha_eq_pe l p e p' e') ⇒ alpha_eq_pe (MAP SWAP l) p' e' p e) ∧
-   (∀ l pes pes'. (repl_valid_sym l ∧ alpha_eq_pes l pes pes') ⇒ alpha_eq_pes (MAP SWAP l) pes' pes) ∧
-   (∀ l es es'. (repl_valid_sym l ∧ alpha_eq_es l es es') ⇒ alpha_eq_es (MAP SWAP l) es' es) ∧
-   (∀ l exp exp'. (repl_valid_sym l ∧ alpha_eq_exp l exp exp') ⇒ alpha_eq_exp (MAP SWAP l) exp' exp) ∧
-   (∀ l f f'. (repl_valid_sym l ∧ alpha_eq_fun l f f') ⇒ alpha_eq_fun (MAP SWAP l) f' f) ∧
-   (∀ l funs funs'. (repl_valid_sym l ∧ alpha_eq_funs l funs funs') ⇒ alpha_eq_funs (MAP SWAP l) funs' funs)`,
-
-   ho_match_mp_tac alpha_eq_exp_ind >>
-   rw[alpha_eq_exp_def] >>
-   fs[alpha_eq_exp_def,alpha_eq_p_sym, extract_repl_p_valid_sym] >>
-   >-
-   >-
-   >-
-   >-
-   >-
-   >-
-   >-
-   )
-
-*)
-
 val is_closed_term_exp_def = Define
 
   `is_closed_term_exp e = (compute_freeID_exp [] e = empty_set)`
@@ -507,18 +395,6 @@ val MEM_SWAP = Q.store_thm("MEM_SWAP",
   >> `(x, y) = h ⇒ (y, x) = SWAP h` by metis_tac[SWAP_def, FST, SND]
   >> `(y, x) = SWAP h ⇒ (x, y) = h` by (EVAL_TAC >> fs[])
   >> metis_tac[]))
-
-(*
-val ALOOKUP_SWAP_NONE_SOME = Q.store_thm("ALOOKUP_SWAP_NONE_SOME",
-
-  `∀ l x x'. ALOOKUP l x = SOME x' ⇔ ALOOKUP (MAP SWAP l) x' ≠ NONE`,
-
-   Induct
->- rw[]
->> rw[]
->> Cases_on `h`
->> rw[SWAP_def, ALOOKUP_MEM, ALOOKUP_def, ALOOKUP_MAP_SWAP, ALOOKUP_MAP_SWAP2])
-*)
 
 val compute_freeID_still_empty_included = Q.store_thm("compute_freeID_still_empty_included",
 
@@ -848,7 +724,7 @@ val is_valid_decs_def = Define
 
 val rename_decs_alpha_eq = Q.store_thm("rename_decs_alpha_eq",
 
-  `∀ decs. (is_valid_decs decs ∧ decs' = compile_decs decs) ⇒ alpha_eq_decs decs decs'`,
+  `∀ decs decs'. (is_valid_decs decs ∧ decs' = compile_decs decs) ⇒ alpha_eq_decs decs decs'`,
 
   Induct
 >- rw[alpha_eq_decs_def, rename_dec_alpha_eq, compile_decs_def, SND, compile_decs_aux_def]
@@ -857,24 +733,15 @@ val rename_decs_alpha_eq = Q.store_thm("rename_decs_alpha_eq",
 
 val alpha_eq_dec_ind = theorem "alpha_eq_dec_ind"
 
-(* TODO *)
-(*
 val (t_rel_rules, t_rel_ind, t_rel_cases) = Hol_reln
 
-   (* TODO: on each case, do we need to check anything on t ? *)
-  `(∀ env env' t t' e e'. alpha_eq_exp (MAP2 (λ x y. (x, y)) env env') e e' ⇒ t_rel env env' e e') ∧ (
-   (∀
+   (* TODO: do we need to check anything on t ? *)
+  `(∀ env env' e e'. alpha_eq_exp (MAP2 (λ x y. (x, y)) env env') e e' ⇒ t_rel env env' e e')`
 
-  t_rel env env' (Raise t e) (Raise t' e')) ∧
-   (∀ env env' t t' e e' pes pes'. (* TODO: do we need to check something about pes and pes' ? *) t_rel env env' e e' ⇒ t_rel env env' (Handle t e pes) (Handle t' e' pes')) ∧
-   (∀ env env' t t' l l'. l = l' ⇒ t_rel env env' (Lit t l) (Lit t' l')) ∧
-   (∀ env env' t t' id id' es es'. (* TODO: do we care about id ? *) LIST_REL t_rel es es' ⇒ t_rel env env' (Con t id es) (Con t' id' es')) ∧
-   (∀ env env' t t' x x'. OPTREL (t_rel env env') (ALOOKUP x env) (ALOOKUP x' env') ⇒ t_rel env env' (Var_local t x) (Var_local t' x')) ∧
-   (∀ env env' t t' x x' e e'. t_rel ({env with v = (x,""::env.v) (x',"plop"::env') e e' ⇒ t_rel env env' (Fun t x e) (Fun t' x' e'))
-)
-*)
+val (env_rel_rules, env_rel_ind, env_rel_cases) = Hol_reln
 
-(*
+  `∀ env env'. LIST_REL (λ (x, e) (x', e'). alpha_eq_exp [(x, x')] e e') env env' ⇒ env_rel env env'`
+
 val (v_rel_rules, v_rel_ind, v_rel_cases) = Hol_reln
 
   `(∀ lit lit'.
@@ -887,13 +754,18 @@ val (v_rel_rules, v_rel_ind, v_rel_cases) = Hol_reln
 
     ∀ env env' x x' e e'.
 
-      LIST_REL (λ (x, e) (x', e'). alpha_eq_exp [(x, x')] e e') env env' ∧
+      env_rel env env' ∧
+      alpha_eq_exp ([(x, x')] ++ (MAP (λ (x, _) (x', _). (x, x')) (ZIP env env'))) e e'
 
-      alpha_eq_exp ([(x, x')] ++ (MAP (λ (x, _) (x', _). (x, x')) (ZIP env env'))) e e' ⇒ v_rel (Closure env x e) (Closure env' x' e')) ∧ (
+      ⇒ v_rel (Closure env x e) (Closure env' x' e')) ∧ (
 
     ∀ env env' funs funs' x x'.
 
-      v_rel funs funs' (* TODO *) ) ∧ (
+      env_rel env env' ∧
+
+       (* TODO *)
+
+      ⇒ v_rel (Recclosure env funs x) (Recclosure env' funs' x')) ∧ (
 
     ∀ loc loc'.
 
@@ -902,7 +774,6 @@ val (v_rel_rules, v_rel_ind, v_rel_cases) = Hol_reln
     ∀ vs vs'.
 
       LIST_REL v_rel vs vs' ⇒ v_rel (Vectorv vs) (Vectorv vs'))`
-      *)
 
 val (sv_rel_rules, sv_rel_ind, sv_rel_cases) = Hol_reln
 
@@ -914,17 +785,20 @@ val (s_rel_rules, s_rel_ind, s_rel_cases) = Hol_reln
 
   `∀ (s : 'a flatSem$state) (s' : 'a flatSem$state).
 
-      s.clock = s'.clock ∧ s.ffi = s'.ffi ∧ LIST_REL sv_rel s.refs s'.refs (* ∧ LIST_REL (OPTION_REL v_rel) s.globals s'.globals *) (* TODO *) ⇒ s_rel s s'`
+      s.clock = s'.clock ∧
+      s.ffi = s'.ffi ∧
+      LIST_REL sv_rel s.refs s'.refs ∧
+      LIST_REL (OPTION_REL v_rel) s.globals s'.globals
+      ⇒ s_rel s s'`
 
-(* TODO *)
-val env_rel_def = Define
+val (result_rel_rules, result_rel_ind, result_rel_cases) = Hol_reln
 
-  `env_rel env env' = T`
-
-(* TODO *)
-val result_rel_def = Define
-
-  `result_rel r r' = T`
+  `(∀ ctors v1 v2.
+      R ctors v1 v2 ⇒ result_rel R ctors (Rval v1) (Rval v2)) ∧ (
+    ∀ ctors v1 v2.
+      v_rel ctors v1 v2 ⇒ result_rel R ctors (Rerr (Rraise v1)) (Rerr (Rraise v2))) ∧ (
+    ∀ ctors e1 e2.
+      alpha_eq_exp ctors e1 e2 ⇒ result_rel R ctors (Rerr (Rabort e1)) (Rerr (Rabort e2)))`
 
 val alpha_eq_es_concat = Q.store_thm("alpha_eq_es_concat",
 
@@ -955,10 +829,6 @@ val alpha_eq_es_LENGTH = Q.store_thm("alpha_eq_es_LENGTH",
 >> rw[alpha_eq_exp_def])
 
 (** NEW NEW ONE **)
-val alpha_eq_env_def = Define
-
-  `alpha_eq_env env env' = T` (* TODO *)
-
 val blablabla = Q.store_thm("blablabla",
 
   `(∀ es es' env env' res res' s s'.
@@ -984,354 +854,5 @@ val blablabla = Q.store_thm("blablabla",
       res' = flatSem$evaluate_match env' s' v' pes' err_v
 
       ⇒ r_rel res res')'
-
-
-(** NEW ONE **)
-val djlksjflskj = Q.store_thm("fjklsjfkl",
-
-  `(∀ env (s : 'ffi flatSem$state) es es' res res' .
-        flatSem$evaluate env s es = res
-      ∧ SND res ≠ Rerr (Rabort Rtype_error)
-      ∧ alpha_eq_es [] es es'
-      ∧ flatSem$evaluate env s es' = res'
-      ⇒ res = res') ∧ (
-
-    ∀ env (s : 'ffi flatSem$state) v pes err_v pes' res res' .
-        flatSem$evaluate_match env s v pes err_v = res
-      ∧ SND res ≠ Rerr (Rabort Rtype_error)
-      ∧ alpha_eq_pes [] pes pes'
-      ∧ flatSem$evaluate_match env s v pes' err_v = res'
-      ⇒ res = res')`,
-
-   ho_match_mp_tac evaluate_ind
->> rw[evaluate_def, alpha_eq_exp_def, alpha_eq_p_def]
->> TRY ( Cases_on `es'`
-  >> fs[evaluate_def, alpha_eq_exp_def])
-  (* single expression case *)
->> TRY (
-     reverse (Cases_on `t`) >- fs[alpha_eq_exp_def]
-  >> Cases_on `h` >> fs[alpha_eq_exp_def, evaluate_def]
-  PURE_REWRITE_TAC [evaluate_def]
-  >> TRY (`alpha_eq_es [] [e] [e']` by rw[alpha_eq_exp_def])
-  >> EVERY_CASE_TAC >> rw[] >> fs[]
-  >> rpt(first_x_assum drule >> rw[])
-  >> fs[]
-  >> qexists_tac`[e']` >> fs[]
-  >> `F` by fs[]
-  )
-  (* TODO alpha_eq on Closures *)
->> TRY (
-     Cases_on `t` >> fs[alpha_eq_exp_def]
-  >> TRY (`alpha_eq_es [] [e1] [h]` by rw[alpha_eq_exp_def])
-  >> TRY (`alpha_eq_es [] (e2 :: es) (h' :: t')` by rw[alpha_eq_exp_def])
-  >> rpt (split_pair_case_tac >> fs[])
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> NTAC 2 CASE_TAC
-  >> rw[] >> fs[]
-  >> rpt (first_x_assum drule >> rw[])
-  >> EVERY_CASE_TAC
-  >> rw[] >> fs[]
-  >> rpt (first_x_assum drule >> rw[])
-  >> `F` by fs[]
-  )
->- ( reverse (Cases_on `t`) >- fs[alpha_eq_exp_def]
-  >> Cases_on `h` >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse]
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> NTAC 2 CASE_TAC
-  >> rw[] >> fs[]
-  >> rfs[]
-  >> rpt (first_x_assum drule >> rw[])
-  >> TRY(qexists_tac`REVERSE l` >> rfs[])
-  >> metis_tac[ alpha_eq_es_LENGTH ]
-  )
-
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse]
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rfs[]
-  >> Cases_on `v3'`
-  >> Cases_on `v3`
-  >> rw[] >> fs[]
-  >> rw[]
-  >> rpt (first_x_assum drule >> rw[] >> fs[])
-  >> Q.EXISTS_TAC `REVERSE l`
-  >> Q.EXISTS_TAC `resState'`
-  >> Q.EXISTS_TAC `Rval a`
-  >> rw[])
-
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def, do_if_def]
-  >> rw[]
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse]
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rfs[]
-  >> Cases_on `v3'`
-  >> Cases_on `v3`
-  >> rw[] >> fs[]
-  >> rw[]
-  >> rpt (first_x_assum drule >> rw[] >> fs[])
-  >> rw[]
-  (* TODO: if *)
-  )
-
-
-
->> TRY(Cases_on`pes'` >> fs[alpha_eq_exp_def,evaluate_def] >> FULL_CASE_TAC >> fs[])
->> TRY ( Cases_on `es'` >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`) >- fs[alpha_eq_exp_def]
-  >> Cases_on `h` >> fs[alpha_eq_exp_def]
-  >> rw[]
-  >> fs[evaluate_def,do_if_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> rfs[]
-  >> TRY ( `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse])
-  >> TRY (first_assum (assume_tac o Q.SPEC `[e']`))
-  >> TRY (first_assum (assume_tac o Q.SPEC `[e]`))
-  >> fs[evaluate_def, alpha_eq_exp_def]
-  >> Cases_on `v4'` (* TODO match sur v4 et v4' *)
-(*
-  >> EVERY_CASE_TAC
-  *)
-  >> rw[] >> fs[] >> rpt (first_x_assum drule >> rw[]) >> fs[]
-  >> Cases_on `v4`
-  >> rw[] >> fs[] >> rpt (first_x_assum drule >> rw[]) >> fs[]
-  >> metis_tac[ alpha_eq_es_LENGTH ]
-)
-cheat
-(* FUN et App, If funs match *)
-)
-
-(** OLD **)
-val djlksjflskj = Q.store_thm("fjklsjfkl",
-
-  `(∀ env (s : 'ffi flatSem$state) es es' resState resState' res res' .
-        flatSem$evaluate env s es = (resState, res)
-      ∧ res ≠ Rerr (Rabort Rtype_error)
-      ∧ alpha_eq_es [] es es'
-      ∧ flatSem$evaluate env s es' = (resState', res')
-      ⇒ resState = resState' ∧ r_rel res res') ∧ (
-
-    ∀ env (s : 'ffi flatSem$state) v pes err_v pes' resState resState' res res' .
-        flatSem$evaluate_match env s v pes err_v = (resState, res)
-      ∧ res ≠ Rerr (Rabort Rtype_error)
-      ∧ alpha_eq_pes [] pes pes'
-      ∧ flatSem$evaluate_match env s v pes' err_v = (resState', res')
-      ⇒ resState = resState' ∧ res = res')`,
-
-   ho_match_mp_tac evaluate_ind
->> rw[evaluate_def, alpha_eq_exp_def, alpha_eq_p_def]
->- ( Cases_on `es'`
-  >> fs[evaluate_def, alpha_eq_exp_def])
->- ( Cases_on `es'`
-  >> fs[evaluate_def, alpha_eq_exp_def])
->- ( Cases_on `es'`
-  >> fs[evaluate_def, alpha_eq_exp_def]
-  >> Cases_on `t`
-  >- fs[alpha_eq_exp_def]
-  >> `alpha_eq_es [] [e1] [h]` by rw[alpha_eq_exp_def]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> fs[evaluate_def]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> EVERY_CASE_TAC
-  >> rw[]
-  >> fs[]
-  >> NTAC 2 (first_x_assum drule >> rw[]))
->- ( Cases_on `es'`
-  >> fs[evaluate_def, alpha_eq_exp_def]
-  >> Cases_on `t`
-  >- fs[alpha_eq_exp_def]
-  >> `alpha_eq_es [] [e1] [h]` by rw[alpha_eq_exp_def]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> fs[evaluate_def]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> EVERY_CASE_TAC
-  >> rw[]
-  >> fs[]
-  >> NTAC 2 (first_x_assum drule >> rw[])
-  >> Cases_on `s' = s'''`
-  >> rw[]
-  >> first_x_assum drule
-  >> rw[]
-  >> fs[])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> first_assum (assume_tac o Q.SPEC `[e']`)
-  >> first_assum (assume_tac o Q.SPEC `[e]`)
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> Cases_on `v4'`
-  >> rw[] >> fs[]
-  >> Cases_on `v4`
-  >> rw[] >> fs[])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> first_assum (assume_tac o Q.SPEC `[e']`)
-  >> first_assum (assume_tac o Q.SPEC `[e]`)
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> Cases_on `v4'`
-  >> rw[] >> fs[]
-  >> Cases_on `v4`
-  >> rw[] >> fs[]
-  >> first_x_assum drule
-  >> rw[])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> first_assum (assume_tac o Q.SPEC `[e']`)
-  >> first_assum (assume_tac o Q.SPEC `[e]`)
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> EVERY_CASE_TAC
-  >> rw[] >> fs[]
-  >> NTAC 3 (first_x_assum drule >> rw[])
-  >> fs[])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> NTAC 2 (split_pair_case_tac >> fs[])
-  >> first_assum (assume_tac o Q.SPEC `[e']`)
-  >> first_assum (assume_tac o Q.SPEC `[e]`)
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> EVERY_CASE_TAC
-  >> rw[] >> fs[]
-  >> NTAC 3 (first_x_assum drule >> rw[])
-  >> fs[])
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse]
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rfs[]
-  >> Cases_on `v3'`
-  >> Cases_on `v3`
-  >> rw[] >> fs[]
-  >> rw[]
-  >> NTAC 2 (first_x_assum drule >> rw[]))
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rw[]
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse]
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rfs[]
-  >> Cases_on `v3'`
-  >> Cases_on `v3`
-  >> rw[] >> fs[]
-  >> rw[]
-  >> rpt (first_x_assum drule >> rw[] >> fs[])
-  >> Q.EXISTS_TAC `REVERSE l`
-  >> Q.EXISTS_TAC `resState'`
-  >> Q.EXISTS_TAC `Rval a`
-  >> rw[])
-
->- ( Cases_on `es'`
-  >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`)
-  >- fs[alpha_eq_exp_def]
-  >> Cases_on `h`
-  >> fs[alpha_eq_exp_def, evaluate_def, do_if_def]
-  >> rw[]
-  >> fs[evaluate_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse]
-  >> fs[alpha_eq_exp_def, evaluate_def]
-  >> rfs[]
-  >> Cases_on `v3'`
-  >> Cases_on `v3`
-  >> rw[] >> fs[]
-  >> rw[]
-  >> rpt (first_x_assum drule >> rw[] >> fs[])
-  >> rw[]
-  (* TODO: if *)
-  )
-
-
-
->> TRY(Cases_on`pes'` >> fs[alpha_eq_exp_def,evaluate_def] >> FULL_CASE_TAC >> fs[])
->> TRY ( Cases_on `es'` >- fs[alpha_eq_exp_def]
-  >> reverse (Cases_on `t`) >- fs[alpha_eq_exp_def]
-  >> Cases_on `h` >> fs[alpha_eq_exp_def]
-  >> rw[]
-  >> fs[evaluate_def,do_if_def]
-  >> rpt (split_pair_case_tac >> fs[])
-  >> rfs[]
-  >> TRY ( `alpha_eq_es [] (REVERSE es) (REVERSE l)` by fs[alpha_eq_es_reverse])
-  >> TRY (first_assum (assume_tac o Q.SPEC `[e']`))
-  >> TRY (first_assum (assume_tac o Q.SPEC `[e]`))
-  >> fs[evaluate_def, alpha_eq_exp_def]
-  >> Cases_on `v4'` (* TODO match sur v4 et v4' *)
-(*
-  >> EVERY_CASE_TAC
-  *)
-  >> rw[] >> fs[] >> rpt (first_x_assum drule >> rw[]) >> fs[]
-  >> Cases_on `v4`
-  >> rw[] >> fs[] >> rpt (first_x_assum drule >> rw[]) >> fs[]
-  >> metis_tac[ alpha_eq_es_LENGTH ]
-)
-cheat
-(* FUN et App, If funs match *)
-)
 
 val _ = export_theory ()
